@@ -1,0 +1,32 @@
+# Local stack: the API plus a persistent data volume.
+#
+#   docker compose up --build
+#   open http://localhost:8000
+#
+# By default this runs the deterministic mock provider, which needs no
+# credentials. Put real settings in a .env file (never commit it) to use a model.
+
+services:
+  paperpilot:
+    build: .
+    image: paperpilot:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # Override these in .env for a real analysis.
+      PAPERPILOT_LLM_PROVIDER: ${PAPERPILOT_LLM_PROVIDER:-mock}
+      PAPERPILOT_LLM_MODEL: ${PAPERPILOT_LLM_MODEL:-gpt-4o-mini}
+      PAPERPILOT_LLM_BASE_URL: ${PAPERPILOT_LLM_BASE_URL:-https://api.openai.com/v1}
+      PAPERPILOT_LLM_API_KEY: ${PAPERPILOT_LLM_API_KEY:-}
+      PAPERPILOT_EMBEDDING_PROVIDER: ${PAPERPILOT_EMBEDDING_PROVIDER:-hashing}
+      PAPERPILOT_LOG_LEVEL: ${PAPERPILOT_LOG_LEVEL:-INFO}
+      PAPERPILOT_MAX_UPLOAD_MB: ${PAPERPILOT_MAX_UPLOAD_MB:-50}
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - paperpilot-data:/data
+    restart: unless-stopped
+
+volumes:
+  paperpilot-data:

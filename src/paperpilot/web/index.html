@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PaperPilot</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --panel: #ffffff; --ink: #1c1a17; --muted: #6b6560;
+    --line: #e5e0d8; --accent: #2f6b5f; --warn: #a8621b; --bad: #9b2c2c;
+    --ok: #2f6b5f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161513; --panel: #1f1e1b; --ink: #ece8e1; --muted: #9c958c;
+      --line: #322f2a; --accent: #6fb3a2; --warn: #d99a52; --bad: #e08585;
+      --ok: #6fb3a2;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px; margin-bottom: 18px;
+  }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em;
+       color: var(--muted); margin: 0 0 14px; font-weight: 600; }
+  input[type=file] { display: block; margin-bottom: 12px; max-width: 100%; }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 7px;
+    padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 4px 0 16px; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  ol.stages { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+  ol.stages li { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  ol.stages li:last-child { border-bottom: 0; }
+  .icon { width: 18px; flex: 0 0 18px; text-align: center; }
+  .stage-name { flex: 0 0 150px; font-weight: 600; }
+  .stage-msg { color: var(--muted); flex: 1; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 13px; }
+  pre.report {
+    white-space: pre-wrap; word-wrap: break-word; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 16px;
+    max-height: 620px; overflow: auto; font-size: 13px; line-height: 1.5;
+  }
+  .note { font-size: 13px; color: var(--muted); }
+  .banner { border-left: 3px solid var(--warn); padding: 8px 12px; margin-bottom: 12px;
+            background: color-mix(in srgb, var(--warn) 8%, transparent); font-size: 13px; }
+  a { color: var(--accent); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PaperPilot</h1>
+  <p class="sub">
+    Citation-grounded analysis of one research paper. Every claim is checked against the
+    original PDF; what cannot be grounded is reported as unsupported rather than hidden.
+  </p>
+
+  <div id="warnings"></div>
+
+  <div class="panel">
+    <h2>1 · Upload</h2>
+    <input type="file" id="file" accept="application/pdf,.pdf">
+    <button id="go">Analyse paper</button>
+    <p class="note" id="uploadNote"></p>
+  </div>
+
+  <div class="panel hidden" id="progressPanel">
+    <h2>2 · Progress</h2>
+    <div class="bar"><i id="bar"></i></div>
+    <ol class="stages" id="stages"></ol>
+  </div>
+
+  <div class="panel hidden" id="agentsPanel">
+    <h2>3 · Agents &amp; why they ran</h2>
+    <table id="agents"></table>
+    <p class="note" id="planNote"></p>
+  </div>
+
+  <div class="panel hidden" id="verifyPanel">
+    <h2>4 · Verification</h2>
+    <div class="pills" id="counts"></div>
+    <div id="weak"></div>
+  </div>
+
+  <div class="panel hidden" id="reportPanel">
+    <h2>5 · Report</h2>
+    <p class="note">
+      <a id="dl" href="#" download="paperpilot-report.md">Download Markdown</a>
+      &nbsp;·&nbsp; <a id="raw" href="#" target="_blank" rel="noopener">Open raw</a>
+    </p>
+    <pre class="report" id="report"></pre>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ICONS = { started: "▸", completed: "✓", skipped: "○", scheduled: "↺", failed: "✗" };
+const CLS   = { completed: "ok", skipped: "warn", failed: "bad", scheduled: "warn" };
+
+async function jget(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error((await res.text()) || res.statusText);
+  return res.json();
+}
+
+(async function health() {
+  try {
+    const h = await jget("/health");
+    if (h.warnings?.length) {
+      $("warnings").innerHTML = h.warnings
+        .map((w) => `<div class="banner">${escapeHtml(w)}</div>`).join("");
+    }
+  } catch { /* health is advisory; the form still works without it */ }
+})();
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderStages(events) {
+  // Collapse to the latest event per stage so the list stays readable.
+  const latest = new Map();
+  for (const e of events) latest.set(e.stage, e);
+  $("stages").innerHTML = [...latest.values()].map((e) => `
+    <li>
+      <span class="icon ${CLS[e.status] || ""}">${ICONS[e.status] || "·"}</span>
+      <span class="stage-name">${escapeHtml(e.stage)}</span>
+      <span class="stage-msg">${escapeHtml(e.message || e.status)}</span>
+    </li>`).join("");
+}
+
+function renderAgents(data) {
+  const rows = Object.entries(data.agents || {});
+  if (!rows.length) return;
+  $("agentsPanel").classList.remove("hidden");
+  $("agents").innerHTML =
+    "<tr><th>Agent</th><th>Status</th><th>Findings</th><th>Attempt</th><th>Why</th></tr>" +
+    rows.map(([name, a]) => `
+      <tr>
+        <td>${escapeHtml(name)}</td>
+        <td class="${a.status === "ok" ? "ok" : a.status === "skipped" ? "warn" : "bad"}">${escapeHtml(a.status)}</td>
+        <td>${a.findings}</td>
+        <td>${a.attempt}</td>
+        <td class="note">${escapeHtml(a.skip_reason || a.error || "")}</td>
+      </tr>`).join("");
+
+  if (data.plan?.rationale) {
+    $("planNote").innerHTML = "<strong>Plan rationale.</strong> " +
+      Object.entries(data.plan.rationale)
+        .map(([k, v]) => `<code>${escapeHtml(k)}</code>: ${escapeHtml(v)}`).join(" · ");
+  }
+  if (data.retry_count) {
+    $("planNote").innerHTML +=
+      `<br><strong>Retries.</strong> ${data.retry_count} round(s) were run because some ` +
+      `claims could not be grounded on the first attempt.`;
+  }
+}
+
+async function renderVerification(analysisId, data) {
+  const counts = data.finding_counts || {};
+  if (!Object.keys(counts).length) return;
+  $("verifyPanel").classList.remove("hidden");
+  $("counts").innerHTML = Object.entries(counts)
+    .map(([k, v]) => `<span class="pill">${v} ${escapeHtml(k.replace(/_/g, " "))}</span>`).join("");
+
+  try {
+    const f = await jget(`/analyses/${analysisId}/findings`);
+    const weak = (f.findings || []).filter((x) =>
+      ["unsupported", "contradicted", "unknown", "inferred"].includes(x.status));
+    $("weak").innerHTML = weak.length
+      ? "<p class='note' style='margin-top:14px'><strong>Not grounded in the paper</strong> " +
+        "— shown so the failure is visible:</p>" +
+        weak.map((x) => `<p class="note">• <em>${escapeHtml(x.status)}</em> — ` +
+          `${escapeHtml(x.claim)}<br><span style="opacity:.8">` +
+          `${escapeHtml(x.verification_note || "")}</span></p>`).join("")
+      : "<p class='note' style='margin-top:14px'>Every finding was grounded in the paper.</p>";
+  } catch { /* findings are supplementary */ }
+}
+
+$("go").addEventListener("click", async () => {
+  const file = $("file").files[0];
+  if (!file) { $("uploadNote").textContent = "Choose a PDF first."; return; }
+
+  $("go").disabled = true;
+  $("progressPanel").classList.remove("hidden");
+  $("uploadNote").textContent = `Uploading ${file.name}…`;
+
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const up = await fetch("/papers", { method: "POST", body: form });
+    if (!up.ok) throw new Error((await up.text()) || "upload failed");
+    const { document_id } = await up.json();
+    $("uploadNote").textContent = `Uploaded. Document ${document_id}.`;
+
+    const start = await fetch(`/papers/${document_id}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wait: false }),
+    });
+    if (!start.ok) throw new Error((await start.text()) || "could not start analysis");
+    const { analysis_id } = await start.json();
+
+    // Poll until the run reaches a terminal state.
+    let data;
+    for (let i = 0; i < 600; i++) {
+      data = await jget(`/analyses/${analysis_id}`);
+      $("bar").style.width = `${Math.round((data.progress || 0) * 100)}%`;
+      renderStages(data.events || []);
+      renderAgents(data);
+      if (data.status === "completed" || data.status === "failed") break;
+      await new Promise((r) => setTimeout(r, 700));
+    }
+
+    await renderVerification(analysis_id, data);
+
+    if (data.status === "completed") {
+      const md = await (await fetch(`/analyses/${analysis_id}/report`)).text();
+      $("reportPanel").classList.remove("hidden");
+      $("report").textContent = md;
+      $("dl").href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+      $("raw").href = `/analyses/${analysis_id}/report`;
+    } else {
+      $("uploadNote").innerHTML =
+        `<span class="bad">Analysis failed.</span> ${escapeHtml((data.errors || []).join("; "))}`;
+    }
+  } catch (err) {
+    $("uploadNote").innerHTML = `<span class="bad">${escapeHtml(err.message)}</span>`;
+  } finally {
+    $("go").disabled = false;
+  }
+});
+</script>
+</body>
+</html>
