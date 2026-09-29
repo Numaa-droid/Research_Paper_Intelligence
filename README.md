@@ -1,3 +1,13 @@
+---
+title: PaperMind
+emoji: 📄
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # PaperPilot
 
 **A verifiable, citation-grounded, multi-agent system for analysing research papers.**

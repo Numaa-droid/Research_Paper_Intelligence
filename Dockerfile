@@ -34,7 +34,7 @@ COPY fixtures ./fixtures
 COPY scripts ./scripts
 
 # Run as a non-root user; the data directory is the only writable path needed.
-RUN useradd --create-home --uid 10001 paperpilot \
+RUN useradd --create-home --uid 1000 paperpilot \
     && mkdir -p /data \
     && chown -R paperpilot:paperpilot /data /app
 USER paperpilot
