@@ -2016,11 +2016,12 @@ $("#toc").addEventListener("click", (e) => {
   try {
     const h = await jget("/health");
     const chips = [
-      ["LLM", h.llm_model || h.llm_provider, h.llm_provider === "mock" ? "var(--warn)" : "var(--ok)"],
-      ["Embeddings", h.embedding_provider, h.embedding_provider === "hashing" ? "var(--warn)" : "var(--ok)"],
+      // Status only: which models back the deployment is not shown to visitors.
+      ["AI", h.llm_provider === "mock" ? "demo" : "ready", h.llm_provider === "mock" ? "var(--warn)" : "var(--ok)"],
+      ["Search", "ready", "var(--ok)"],
       ["OCR", h.ocr_available ? "ready" : "off", h.ocr_available ? "var(--ok)" : "var(--faint)"],
     ];
-    $("#sys").innerHTML = chips.map(([k, v, c]) => `<span class="chip" title="${esc(k)}: ${esc(v)}"><span class="dot" style="--c:${c}"></span>${k} <b>${esc(v)}</b></span>`).join("")
+    $("#sys").innerHTML = chips.map(([k, v, c]) => `<span class="chip"><span class="dot" style="--c:${c}"></span>${k} <b>${esc(v)}</b></span>`).join("")
       + `<span class="chip">v${esc(h.version)}</span>`;
     const dismissed = store.get("pp-dismissed", []);
     const warnings = (h.warnings || []).filter((w) => !dismissed.includes(w));
