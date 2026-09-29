@@ -17,12 +17,12 @@ htmlcov/
 .mypy_cache/
 
 # PaperPilot runtime artefacts (never commit uploads, indexes or generated reports)
-data/
-storage/
-uploads/
-indexes/
-cache/
-logs/
+/data/
+/storage/
+/uploads/
+/indexes/
+/cache/
+/logs/
 reports/*
 !reports/.gitkeep
 *.sqlite
