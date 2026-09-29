@@ -340,8 +340,16 @@ details.banner button { position: absolute; right: 10px; top: 8px; }
 .run-alert ul { grid-column: 2; margin: 0; padding-left: 18px; color: var(--muted); overflow-wrap: anywhere; }
 .run-alert p { grid-column: 2; margin: 0; color: var(--muted); }
 .graph-wrap { overflow-x: auto; margin: 6px -8px 0; padding: 0 8px; -webkit-overflow-scrolling: touch; }
+.graph-wrap.tall #graph { min-width: 0; max-width: 400px; margin: 0 auto; }
 #graph { display: block; width: 100%; min-width: 860px; height: auto; user-select: none; -webkit-user-select: none; }
 .graph-hint { font-size: 12px; color: var(--faint); margin: 2px 0 0; text-align: right; }
+.graph-wrap.tall + .graph-hint { text-align: center; }
+/* Tall graph with room beside it (tablets): graph left, activity and inspector right. */
+.mission-body.side { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.mission-body.side .graph-col { position: sticky; top: 76px; }
+.mission-body.side .mission-grid { grid-template-columns: 1fr; margin-top: 6px; }
+.touch-only { display: none; }
+@media (hover: none) { .touch-only { display: inline; } .hover-only { display: none; } }
 .mission-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px; margin-top: 12px; }
 @media (max-width: 880px) { .mission-grid { grid-template-columns: 1fr; } }
 .subpanel { background: var(--panel-2); border: 1px solid var(--line); border-radius: calc(var(--radius) - 4px); padding: 12px 14px; min-height: 290px; min-width: 0; }
@@ -627,7 +635,7 @@ details.banner button { position: absolute; right: 10px; top: 8px; }
 .report-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
 .report-bar .spacer { flex: 1; }
 .report-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 28px; }
-@media (max-width: 880px) { .report-layout { grid-template-columns: 1fr; } .toc { display: none; } }
+@media (max-width: 880px) { .report-layout { grid-template-columns: minmax(0, 1fr); } .toc { display: none; } }
 .toc { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 100px); overflow: auto; }
 .toc h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .toc ol { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line); }
@@ -653,8 +661,9 @@ details.banner button { position: absolute; right: 10px; top: 8px; }
 .md hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .table-wrap { overflow-x: auto; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 10px; }
 .md table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.45; }
-.md th, .md td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
-.md th { background: var(--panel-2); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.md th, .md td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: normal; }
+/* Narrow screens scroll the table (.table-wrap) rather than splitting headers mid-word. */
+.md th { white-space: nowrap; background: var(--panel-2); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .md tr:last-child td { border-bottom: 0; }
 
 /* toasts */
@@ -766,10 +775,13 @@ footer.foot a { color: var(--muted); }
     </div>
     <div class="progress" aria-hidden="true"><i id="bar"></i></div>
     <div class="run-alert" id="runAlert" role="alert" hidden></div>
+    <div class="mission-body">
+    <div class="graph-col">
     <div class="graph-wrap">
       <svg id="graph" viewBox="0 0 1290 476" role="group" aria-label="Agent workflow graph. Select a stage to inspect it."></svg>
     </div>
-    <p class="graph-hint">Click any stage to inspect it</p>
+    <p class="graph-hint"><span class="hover-only">Click</span><span class="touch-only">Tap</span> any stage to inspect it</p>
+    </div>
     <div class="mission-grid">
       <div class="subpanel">
         <div class="subpanel-head"><h3>Live activity</h3><span class="muted small" id="feedCount"></span></div>
@@ -780,6 +792,7 @@ footer.foot a { color: var(--muted); }
         </div>
       </div>
       <aside class="subpanel" id="inspector" aria-live="polite"></aside>
+    </div>
     </div>
   </section>
 
@@ -1040,42 +1053,80 @@ const EDGES = [
   ...AGENTS.map((a) => [`agent:${a}`, "aggregation"]),
   ["aggregation", "verification"], ["verification", "report"],
 ];
-const RETRY_PATH = "M1058,207 C1058,12 716,12 716,57";
-const nodeW = (key) => key.startsWith("agent:") ? 140 : 126;
-const NODE_H = 62;
+/* Two layouts over the same nodes: left-to-right where the graph has room, and
+   top-to-bottom on narrow screens, where the wide one would shrink past legibility.
+   In the tall layout the specialists stack in their lane and hang off two rails. */
+const WIDE = {
+  w: 1290, h: 476, pos: Object.fromEntries(Object.entries(DEF).filter(([, n]) => n.x != null).map(([k, n]) => [k, [n.x, n.y]])),
+};
+const TALL_X = 170, TALL_AGENT_Y = [357, 417, 477, 537];
+const TALL = {
+  w: 340, h: 850,
+  pos: {
+    upload: [TALL_X, 36], ingestion: [TALL_X, 112], indexing: [TALL_X, 188], planning: [TALL_X, 264],
+    ...Object.fromEntries(AGENTS.map((a, i) => [`agent:${a}`, [TALL_X, TALL_AGENT_Y[i]]])),
+    aggregation: [TALL_X, 650], verification: [TALL_X, 726], report: [TALL_X, 802],
+  },
+};
+let tall = false;
+const layout = () => (tall ? TALL : WIDE);
+const nodeW = (key) => tall ? 200 : key.startsWith("agent:") ? 140 : 126;
+const nodeH = (key) => tall && key.startsWith("agent:") ? 50 : 62;
 const domId = (key) => `n-${key.replace(":", "-")}`;
 const edgeId = (a, b) => `e-${a.replace(":", "-")}--${b.replace(":", "-")}`;
 function edgePath(a, b) {
   const A = DEF[a], B = DEF[b];
-  const x1 = A.x + nodeW(a) / 2, x2 = B.x - nodeW(b) / 2, mx = (x1 + x2) / 2;
-  return `M${x1},${A.y} C${mx},${A.y} ${mx},${B.y} ${x2},${B.y}`;
+  if (!tall) {
+    const x1 = A.x + nodeW(a) / 2, x2 = B.x - nodeW(b) / 2, mx = (x1 + x2) / 2;
+    return `M${x1},${A.y} C${mx},${A.y} ${mx},${B.y} ${x2},${B.y}`;
+  }
+  const bottom = A.y + nodeH(a) / 2, top = B.y - nodeH(b) / 2;
+  if (b.startsWith("agent:")) {   // down the left rail, into the agent's left side
+    const ay = B.y, left = B.x - nodeW(b) / 2;
+    return `M${A.x},${bottom} C${A.x},${bottom + 17} 40,${bottom + 9} 40,${bottom + 29} L40,${ay - 10} Q40,${ay} 50,${ay} L${left},${ay}`;
+  }
+  if (a.startsWith("agent:")) {   // out of the agent's right side, down the right rail
+    const ay = A.y, right = A.x + nodeW(a) / 2;
+    return `M${right},${ay} L290,${ay} Q300,${ay} 300,${ay + 10} L300,${top - 23} C300,${top - 7} ${B.x},${top - 15} ${B.x},${top}`;
+  }
+  const my = (bottom + top) / 2;
+  return `M${A.x},${bottom} C${A.x},${my} ${B.x},${my} ${B.x},${top}`;
 }
 
 function buildGraph() {
+  const L = layout();
+  for (const [key, [x, y]] of Object.entries(L.pos)) Object.assign(DEF[key], { x, y });
+  const svg = $("#graph");
+  svg.setAttribute("viewBox", `0 0 ${L.w} ${L.h}`);
+  svg.closest(".graph-wrap").classList.toggle("tall", tall);
   let h = `<defs><pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle class="grid-dot" cx="1.5" cy="1.5" r="1.1"/></pattern></defs>
-    <rect width="1290" height="476" fill="url(#dots)" opacity=".7"/>
-    <rect class="lane" x="628" y="43" width="176" height="390" rx="22"/>
+    <rect width="${L.w}" height="${L.h}" fill="url(#dots)" opacity=".7"/>`;
+  h += tall
+    ? `<rect class="lane" x="28" y="318" width="284" height="272" rx="22"/>`
+    : `<rect class="lane" x="628" y="43" width="176" height="390" rx="22"/>
     <text class="lane-label" x="716" y="458" text-anchor="middle">parallel specialists</text>`;
   const edge = (id, d, cls = "") => `<g class="edge ${cls}" id="${id}" data-state="idle" data-d="${d}">
       <path class="edge-base" d="${d}"/><path class="edge-dash" d="${d}"/><path class="edge-done" d="${d}" pathLength="100"/>
       <g class="particles"></g></g>`;
   for (const [a, b] of EDGES) h += edge(edgeId(a, b), edgePath(a, b));
-  h += edge("e-retry", RETRY_PATH, "retry");
+  // The retry loop runs from the verifier back to the specialists' lane.
+  h += edge("e-retry", tall ? "M70,726 C14,726 14,712 14,690 L14,604 C14,594 20,590 28,590" : "M1058,207 C1058,12 716,12 716,57", "retry");
+  const [px, py] = tall ? [36, 577] : [832, 31];
   h += `<g class="retry-pill" id="n-retry" data-node="retry" data-state="idle" tabindex="0" role="button" aria-label="Retry loop">
-      <title>Retry loop</title><rect x="832" y="31" width="110" height="26" rx="13"/>
-      <text x="887" y="48" text-anchor="middle">retry loop</text></g>`;
+      <title>Retry loop</title><rect x="${px}" y="${py}" width="${tall ? 124 : 110}" height="26" rx="13"/>
+      <text x="${px + (tall ? 62 : 55)}" y="${py + 17}" text-anchor="middle">retry loop</text></g>`;
   for (const [key, n] of Object.entries(DEF)) {
     if (key === "retry") continue;
-    const w = nodeW(key), x = n.x - w / 2, y = n.y - NODE_H / 2;
+    const w = nodeW(key), nh = nodeH(key), x = n.x - w / 2, y = n.y - nh / 2;
     h += `<g class="node" id="${domId(key)}" data-node="${key}" data-state="idle" tabindex="0" role="button" aria-label="${n.label}">
       <title>${n.title}</title>
-      <rect class="node-halo" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${NODE_H + 10}" rx="19"/>
-      <rect class="burst" x="${x}" y="${y}" width="${w}" height="${NODE_H}" rx="15"/>
-      <rect class="node-ring" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${NODE_H + 10}" rx="19"/>
-      <rect class="node-body" x="${x}" y="${y}" width="${w}" height="${NODE_H}" rx="15"/>
+      <rect class="node-halo" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${nh + 10}" rx="19"/>
+      <rect class="burst" x="${x}" y="${y}" width="${w}" height="${nh}" rx="15"/>
+      <rect class="node-ring" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${nh + 10}" rx="19"/>
+      <rect class="node-body" x="${x}" y="${y}" width="${w}" height="${nh}" rx="15"/>
       <g transform="translate(${x + 26},${n.y})">
-        <circle class="spinner" r="19.5"/>
-        <circle class="icon-bg" r="15.5"/>
+        <circle class="spinner" r="${nh < 62 ? 17.5 : 19.5}"/>
+        <circle class="icon-bg" r="${nh < 62 ? 14 : 15.5}"/>
         <g class="glyph" transform="translate(-9,-9) scale(.75)">${ICONS[n.icon]}</g>
       </g>
       <text class="node-label" x="${x + 50}" y="${n.y - 3}">${n.label}</text>
@@ -1083,7 +1134,7 @@ function buildGraph() {
       <g transform="translate(${x + w - 3},${y + 3})"><g class="badge"><circle r="8.5"/><path d="M-3.8,.2 l2.5,2.5 l5,-5"/></g></g>
     </g>`;
   }
-  $("#graph").innerHTML = h;
+  svg.innerHTML = h;
 }
 buildGraph();
 
@@ -1112,6 +1163,14 @@ function makeRun(kind) {
   };
 }
 let run = makeRun("idle");
+new ResizeObserver(([entry]) => {
+  const width = entry.contentRect.width;
+  $(".mission-body").classList.toggle("side", width < 960 && width >= 640);
+  if ((width < 960) === tall) return;
+  tall = width < 960;
+  buildGraph();
+  paintGraph();
+}).observe($(".mission-body"));
 
 /* ---------- timer ---------- */
 let timerFrame = null, timerStart = 0;
