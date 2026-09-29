@@ -22,7 +22,13 @@ WORKDIR /app
 # invalidate the (slow) install layer.
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir ".[ocr]"
+# Optional extras to bake in, e.g. "ocr,embeddings" when the runtime config
+# selects PAPERPILOT_EMBEDDING_PROVIDER=sentence_transformers. Torch comes from
+# the CPU wheel index so the image does not pull multi-GB CUDA libraries.
+ARG PAPERPILOT_EXTRAS=ocr
+RUN pip install --no-cache-dir \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        ".[${PAPERPILOT_EXTRAS}]"
 
 COPY fixtures ./fixtures
 COPY scripts ./scripts
@@ -35,7 +41,8 @@ USER paperpilot
 
 ENV PAPERPILOT_DATA_DIR=/data \
     PAPERPILOT_DATABASE_URL=sqlite:////data/paperpilot.sqlite \
-    PAPERPILOT_LOG_FORMAT=json
+    PAPERPILOT_LOG_FORMAT=json \
+    HF_HOME=/data/hf-cache
 
 EXPOSE 8000
 VOLUME ["/data"]

@@ -148,8 +148,12 @@ class SentenceTransformersProvider(EmbeddingProvider):
                 "sentence-transformers is not installed; "
                 "install the 'embeddings' extra or use PAPERPILOT_EMBEDDING_PROVIDER=hashing"
             ) from exc
-        self._model = SentenceTransformer(model)
-        self.dim = int(self._model.get_sentence_embedding_dimension())
+        self._model = SentenceTransformer(model, model_kwargs=_cpu_model_kwargs())
+        # sentence-transformers 6 renamed the accessor; keep older releases working.
+        get_dim = getattr(self._model, "get_embedding_dimension", None) or (
+            self._model.get_sentence_embedding_dimension
+        )
+        self.dim = int(get_dim())
 
     def embed(self, texts: list[str]) -> list[list[float]]:  # pragma: no cover - optional
         # Torch's MPS (and CUDA) backends are not safe for concurrent inference
@@ -158,6 +162,21 @@ class SentenceTransformersProvider(EmbeddingProvider):
         with TORCH_INFERENCE_LOCK:
             vectors = self._model.encode(texts, normalize_embeddings=True)
         return [list(map(float, v)) for v in vectors]
+
+
+def _cpu_model_kwargs() -> dict[str, str]:
+    """Model kwargs for CPU-only hosts (e.g. a Docker container).
+
+    On CPU, torch's SDPA kernel with a padding mask falls back to a slow path:
+    a ModernBERT encoder ran ~10x slower than with eager attention (33s vs 3.3s
+    per 32 chunks on 4 aarch64 cores). Accelerators keep the default kernel.
+    """
+    import torch
+
+    mps = getattr(torch.backends, "mps", None)
+    if torch.cuda.is_available() or (mps is not None and mps.is_available()):
+        return {}
+    return {"attn_implementation": "eager"}
 
 
 def _normalize(vector: list[float]) -> list[float]:

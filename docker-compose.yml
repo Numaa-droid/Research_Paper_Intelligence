@@ -8,7 +8,12 @@
 
 services:
   paperpilot:
-    build: .
+    build:
+      context: .
+      args:
+        # Must include "embeddings" when PAPERPILOT_EMBEDDING_PROVIDER is
+        # sentence_transformers, "layout" for PP-Structure, and so on.
+        PAPERPILOT_EXTRAS: ${PAPERPILOT_EXTRAS:-ocr}
     image: paperpilot:latest
     ports:
       - "8000:8000"
@@ -21,9 +26,22 @@ services:
       PAPERPILOT_EMBEDDING_PROVIDER: ${PAPERPILOT_EMBEDDING_PROVIDER:-hashing}
       PAPERPILOT_LOG_LEVEL: ${PAPERPILOT_LOG_LEVEL:-INFO}
       PAPERPILOT_MAX_UPLOAD_MB: ${PAPERPILOT_MAX_UPLOAD_MB:-50}
+      # Pin storage to the volume: a relative data dir in .env (for non-Docker
+      # runs) would otherwise put uploads and the database in the container's
+      # writable layer, lost whenever it is recreated.
+      PAPERPILOT_DATA_DIR: /data
+      PAPERPILOT_DATABASE_URL: sqlite:////data/paperpilot.sqlite
+      # Inside the container 127.0.0.1 is the container itself, so the
+      # llama-server started on the host by `make ocr-server` is reached via
+      # host.docker.internal. `environment` wins over env_file, so a loopback
+      # URL in .env (meant for non-Docker runs) does not leak in here.
+      PAPERPILOT_OCR_BASE_URL: ${PAPERPILOT_DOCKER_OCR_BASE_URL:-http://host.docker.internal:8080/v1}
     env_file:
       - path: .env
         required: false
+    extra_hosts:
+      # Docker Desktop defines this name already; Linux engines need the mapping.
+      - "host.docker.internal:host-gateway"
     volumes:
       - paperpilot-data:/data
     restart: unless-stopped
