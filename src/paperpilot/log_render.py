@@ -1,4 +1,4 @@
-"""Human-readable rendering of PaperPilot's structured log events.
+"""Human-readable rendering of PaperMind's structured log events.
 
 A structured event such as::
 
@@ -123,7 +123,7 @@ def _progress(f: dict) -> str:
 MESSAGES: dict[str, Callable[[dict], str]] = {
     "progress": _progress,
     "api.startup": lambda f: (
-        f"PaperPilot {f.get('version')} ready — LLM: {f.get('llm_provider')}"
+        f"PaperMind {f.get('version')} ready — LLM: {f.get('llm_provider')}"
         f"{' (' + str(f['llm_model']) + ')' if f.get('llm_model') else ''}, "
         f"embeddings: {f.get('embedding_provider')}"
     ),

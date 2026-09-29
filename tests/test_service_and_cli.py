@@ -232,7 +232,7 @@ def test_cli_analyze_writes_a_report(tmp_path, paper_pdf, capsys):
     )
     assert code == EXIT_OK
     report = output.read_text(encoding="utf-8")
-    assert "# PaperPilot Report" in report
+    assert "# PaperMind Report" in report
     assert "[p. " in report
 
 

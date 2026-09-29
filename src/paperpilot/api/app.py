@@ -14,14 +14,14 @@ from .routes import register_error_handlers, router
 from .tasks import TaskRunner, ThreadPoolTaskRunner
 
 DESCRIPTION = """\
-**PaperPilot** analyses a single research-paper PDF and returns a citation-grounded
+**PaperMind** analyses a single research-paper PDF and returns a citation-grounded
 Markdown report.
 
 Every factual statement in a report is either backed by a quote that was
 re-checked against the original PDF, or explicitly labelled as an inference, an
 uncertainty, or an unsupported claim.
 
-PaperPilot is a domain-specific application. It is not general intelligence, it
+PaperMind is a domain-specific application. It is not general intelligence, it
 knows nothing about a paper beyond the PDF you submit, and it verifies claims only
 against that paper's own text.
 
@@ -58,11 +58,11 @@ def create_app(
         info("api.shutdown")
 
     app = FastAPI(
-        title="PaperPilot",
+        title="PaperMind",
         description=DESCRIPTION,
         version=__version__,
         lifespan=lifespan,
-        contact={"name": "PaperPilot"},
+        contact={"name": "PaperMind"},
     )
     app.state.settings = settings
     app.state.service = service or PaperPilotService(settings)

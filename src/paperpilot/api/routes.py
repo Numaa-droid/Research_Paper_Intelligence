@@ -233,7 +233,7 @@ def index() -> HTMLResponse:
     """Minimal UI: upload, watch progress, read the report."""
     page = _WEB_DIR / "index.html"
     if not page.exists():
-        return HTMLResponse("<h1>PaperPilot</h1><p>UI asset missing. API is at /docs.</p>")
+        return HTMLResponse("<h1>PaperMind</h1><p>UI asset missing. API is at /docs.</p>")
     return HTMLResponse(page.read_text(encoding="utf-8"))
 
 

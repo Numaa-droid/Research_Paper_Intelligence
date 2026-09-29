@@ -223,7 +223,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
         print("error: uvicorn is not installed", file=sys.stderr)
         return EXIT_FAILED
 
-    print(f"PaperPilot API on http://{args.host}:{args.port} (UI at /)", file=sys.stderr)
+    print(f"PaperMind API on http://{args.host}:{args.port} (UI at /)", file=sys.stderr)
     uvicorn.run(
         "paperpilot.api.app:app",
         host=args.host,
@@ -276,7 +276,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="paperpilot",
         description=(
-            "PaperPilot: citation-grounded multi-agent analysis of a single research paper."
+            "PaperMind: citation-grounded multi-agent analysis of a single research paper."
         ),
     )
     parser.add_argument("--version", action="version", version=f"paperpilot {__version__}")

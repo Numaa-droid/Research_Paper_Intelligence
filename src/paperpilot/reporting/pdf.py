@@ -79,7 +79,7 @@ def render_report_pdf(markdown: str, *, title: str | None = None) -> bytes:
     writer.close()
 
     document = pymupdf.open("pdf", buffer.getvalue())
-    label = f"PaperPilot report · {title}" if title else "PaperPilot report"
+    label = f"PaperMind report · {title}" if title else "PaperMind report"
     if len(label) > 90:
         label = label[:89] + "…"
     total = document.page_count
@@ -92,11 +92,11 @@ def render_report_pdf(markdown: str, *, title: str | None = None) -> bytes:
         page.insert_text((_PAGE.width - _MARGIN_X - width, y), counter, fontsize=7.5, color=(0.39, 0.45, 0.55))
     document.set_metadata(
         {
-            "title": title or "PaperPilot report",
-            "author": "PaperPilot",
+            "title": title or "PaperMind report",
+            "author": "PaperMind",
             "subject": "Citation-grounded research paper analysis",
-            "creator": "PaperPilot",
-            "producer": "PaperPilot (PyMuPDF)",
+            "creator": "PaperMind",
+            "producer": "PaperMind (PyMuPDF)",
         }
     )
     data = document.tobytes(garbage=3, deflate=True)

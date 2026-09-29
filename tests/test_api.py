@@ -159,7 +159,7 @@ def test_report_is_markdown_with_citations(client, pdf_bytes):
     assert response.status_code == 200
     assert "text/markdown" in response.headers["content-type"]
     assert "[p. " in response.text
-    assert "# PaperPilot Report" in response.text
+    assert "# PaperMind Report" in response.text
 
 
 def test_report_as_json_returns_the_full_record(client, pdf_bytes):
@@ -198,7 +198,7 @@ def test_report_for_an_incomplete_analysis_is_409(client, pdf_bytes):
 def test_index_page_is_served(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert "PaperPilot" in response.text
+    assert "PaperMind" in response.text
 
 
 def test_openapi_schema_is_available(client):
