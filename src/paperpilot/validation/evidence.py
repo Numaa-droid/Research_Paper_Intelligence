@@ -11,13 +11,15 @@ unverifiable, because silently dropping it would hide the failure from the user.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from ..domain.enums import CitationQuality, ElementType, FindingStatus
-from ..domain.models import Evidence, Finding
+from ..domain.models import Evidence, Finding, PaperChunk
 from ..retrieval.index import PaperIndex
-from .numeric import check_claim_numbers, numeric_accuracy
-from .quotes import match_quote
+from .numeric import check_claim_numbers, extract_numbers, numbers_equal, numeric_accuracy
+from .quotes import QuoteMatch, match_quote, normalize_for_match
+from .values import locate_value
 
 
 @dataclass(slots=True)
@@ -62,6 +64,109 @@ def resolve_evidence_chunk(evidence: Evidence, index: PaperIndex) -> str | None:
     if len(candidates) == 1:
         return candidates[0].chunk_id
     return None
+
+
+def locate_quote(
+    quote: str, index: PaperIndex, *, near_page: int | None = None
+) -> tuple[PaperChunk, QuoteMatch] | None:
+    """Find the chunk of the paper a quote comes from.
+
+    Every chunk is searched for a verbatim or normalised match, in document
+    order; fuzzy matching, which is slower, is limited to the pages next to
+    ``near_page``, where a mis-cited quote most often really sits.
+    """
+    for chunk in index.chunks:
+        match = match_quote(quote, chunk.text, fuzzy=False)
+        if match.found:
+            return chunk, match
+    if near_page is None:
+        return None
+    for page in (near_page - 1, near_page + 1):
+        for chunk in index.page(page):
+            match = match_quote(quote, chunk.text)
+            if match.found:
+                return chunk, match
+    return None
+
+
+_SEPARATOR_ROW = re.compile(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$")
+#: Rows substituted for a paraphrased table reading, at most.
+_MAX_TABLE_ROWS = 8
+#: "Table 3", "Figure 2", "Section 6.2", "Eq. (1)": names of things, not values.
+_ELEMENT_REFERENCE = re.compile(
+    r"\b(?:tables?|figures?|figs?\.|sections?|§|eqs?\.?|equations?|rows?|columns?)\s*\(?[\dA-Z][\w.]*\)?",
+    re.IGNORECASE,
+)
+
+
+def _table_chunks(chunk: PaperChunk | None, page: int, index: PaperIndex) -> list[PaperChunk]:
+    """The table a quote cites: the cited chunk's table, else the tables on its page."""
+    if chunk is not None and chunk.element_type is ElementType.TABLE and chunk.element_id:
+        return index.by_element_id(chunk.element_id)
+    return [c for c in index.page(page) if c.element_type is ElementType.TABLE]
+
+
+def match_table_quote(
+    evidence: Evidence, chunk: PaperChunk | None, index: PaperIndex
+) -> tuple[PaperChunk, QuoteMatch] | None:
+    """Accept a quote that reads a table the way a table is read.
+
+    Two deterministic cases, both limited to the cited table:
+
+    * **Rows.** Every quoted line is a row of the table. Rows need not be
+      adjacent: quoting the header and the two rows compared is faithful.
+    * **Values.** The quote paraphrases the table ("Table 4 shows F1 91.3 …")
+      and every number in it, at least two, is a cell of the table. The quote
+      is replaced by the table rows that hold those numbers, verbatim, and the
+      substitution is recorded.
+
+    A quote with any number the table does not contain matches neither.
+    """
+    tables = _table_chunks(chunk, evidence.page, index)
+    if not tables:
+        return None
+    rows = [
+        (table, line.strip())
+        for table in tables
+        for line in table.text.split("\n")
+        if line.strip() and not _SEPARATOR_ROW.match(line.strip())
+    ]
+    normalized_rows = [normalize_for_match(line) for _, line in rows]
+
+    quoted = [
+        normalize_for_match(line)
+        for line in evidence.quote.split("\n")
+        if line.strip() and not _SEPARATOR_ROW.match(line.strip())
+    ]
+    quoted = [line for line in quoted if line]
+    if len(quoted) >= 2 and all(len(q) >= 8 for q in quoted) and all(any(q in row for row in normalized_rows) for q in quoted):
+        table = next(t for (t, _), row in zip(rows, normalized_rows, strict=True) if quoted[0] in row)
+        return table, QuoteMatch(
+            CitationQuality.NORMALIZED, 1.0, note="quoted rows found in the cited table"
+        )
+
+    numbers = extract_numbers(_ELEMENT_REFERENCE.sub(" ", evidence.quote))
+    table_numbers = [n for _, line in rows for n in extract_numbers(line, skip_trivial=False)]
+    if len(numbers) < 2 or not all(
+        any(numbers_equal(n, t) for t in table_numbers) for n in numbers
+    ):
+        return None
+    holding = [
+        (table, line)
+        for table, line in rows
+        if any(numbers_equal(n, c) for n in numbers for c in extract_numbers(line, skip_trivial=False))
+    ][:_MAX_TABLE_ROWS]
+    if not holding:
+        return None
+    evidence.quote = "\n".join(line for _, line in holding)
+    return holding[0][0], QuoteMatch(
+        CitationQuality.NORMALIZED,
+        1.0,
+        note=(
+            "the quote paraphrased the table; replaced by the table rows holding its "
+            f"{len(numbers)} number(s), all of which are in the table"
+        ),
+    )
 
 
 def validate_evidence(evidence: Evidence, index: PaperIndex) -> EvidenceValidation:
@@ -118,6 +223,35 @@ def validate_evidence(evidence: Evidence, index: PaperIndex) -> EvidenceValidati
             evidence.chunk_id = None
             chunk = None
             match = page_match
+
+    if not match.found:
+        table_match = match_table_quote(evidence, chunk, index)
+        if table_match is not None:
+            table_chunk, match = table_match
+            if chunk is None or chunk.element_id != table_chunk.element_id:
+                chunk = table_chunk
+                evidence.chunk_id = table_chunk.chunk_id
+            if match.note:
+                notes.append(match.note)
+                match.note = None
+
+    if not match.found:
+        # A real quote attributed to the wrong source is a mis-location, not an
+        # invention: find where it actually is and correct the citation.
+        located = locate_quote(evidence.quote, index, near_page=evidence.page)
+        if located is not None:
+            found_chunk, found_match = located
+            notes.append(
+                f"quote was not on the cited page {evidence.page}; found on page "
+                f"{found_chunk.page} and the citation was corrected"
+            )
+            evidence.page = found_chunk.page
+            evidence.chunk_id = found_chunk.chunk_id
+            evidence.section = found_chunk.citation_section
+            evidence.element_id = found_chunk.element_id
+            evidence.source_type = found_chunk.element_type
+            chunk = found_chunk
+            match = found_match
 
     evidence.citation_quality = match.quality
     evidence.confidence = match.adjusted_confidence(base_confidence)
@@ -198,6 +332,18 @@ def validate_finding(finding: Finding, index: PaperIndex) -> FindingValidation:
         finding.confidence = min(finding.confidence, 0.25)
     else:
         checks = check_claim_numbers(finding.claim, [r.evidence for r in verified])
+        missing = [c.value for c in checks if not c.found_in_evidence]
+        if missing:
+            # A number read off a cited table is in that table, not in the
+            # sentence quoted beside it: look in the cited elements' own lines.
+            cited = [c for r in verified if r.evidence.chunk_id and (c := index.get(r.evidence.chunk_id))]
+            for value in missing:
+                located = locate_value(value, index, name=None, cited=cited)
+                if located is not None and validate_evidence(located, index).ok:
+                    finding.evidence.append(located)
+                    reports.append(EvidenceValidation(evidence=located, ok=True))
+            verified = [r for r in reports if r.ok]
+            checks = check_claim_numbers(finding.claim, [r.evidence for r in verified])
         accuracy = numeric_accuracy(checks)
         if accuracy < 1.0:
             missing = [c.value for c in checks if not c.found_in_evidence]

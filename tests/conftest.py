@@ -6,6 +6,7 @@ no credentials, no external services.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -22,6 +23,14 @@ from paperpilot.observability import configure_logging  # noqa: E402
 from paperpilot.providers.embeddings import HashingEmbeddingProvider  # noqa: E402
 from paperpilot.providers.mock_llm import MockLLMProvider  # noqa: E402
 from paperpilot.retrieval.retriever import build_retriever  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _ignore_local_env(monkeypatch):
+    """Keep a developer's real ``.env`` (API keys, providers) out of the suite."""
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    for name in [k for k in os.environ if k.startswith("PAPERPILOT_")]:
+        monkeypatch.delenv(name)
 
 
 @pytest.fixture(scope="session", autouse=True)

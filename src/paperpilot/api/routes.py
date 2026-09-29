@@ -11,6 +11,7 @@ from .. import __version__
 from ..domain.enums import AnalysisStatus
 from ..errors import PaperPilotError, UnsupportedFileError
 from ..observability import info
+from ..response import SCHEMA_VERSION, response_document_json_schema
 from ..service import PaperPilotService
 from .schemas import (
     AnalysisResponse,
@@ -39,7 +40,7 @@ def health(service: PaperPilotService = Depends(get_service)) -> HealthResponse:
     from ..ingestion.ocr import build_ocr_engine
 
     settings = service.settings
-    ocr = build_ocr_engine(enabled=settings.ocr_enabled, language=settings.ocr_language)
+    ocr = build_ocr_engine(**settings.ocr_engine_options())
 
     warnings: list[str] = []
     if settings.llm_provider == "mock":
@@ -48,8 +49,13 @@ def health(service: PaperPilotService = Depends(get_service)) -> HealthResponse:
             "but reports are not a real analysis. Set PAPERPILOT_LLM_PROVIDER."
         )
     if settings.ocr_enabled and not ocr.available:
+        unavailable = (
+            f"the PaddleOCR-VL server at {settings.ocr_base_url} is not reachable"
+            if settings.ocr_engine == "paddleocr_vl"
+            else "Tesseract is unavailable"
+        )
         warnings.append(
-            "OCR is enabled but Tesseract is unavailable; scanned pages will be indexed "
+            f"OCR is enabled but {unavailable}; scanned pages will be indexed "
             "with whatever native text exists."
         )
     if settings.embedding_provider == "hashing":
@@ -176,10 +182,50 @@ def get_findings(analysis_id: str, service: PaperPilotService = Depends(get_serv
         "status": record.status.value,
         "findings": [f.model_dump(mode="json") for f in record.findings],
         "verification_results": [
-            v.model_dump(mode="json") for v in record.verification_results
+            v.model_dump(mode="json", exclude=_RESPONSE_FIELDS)
+            for v in record.verification_results
         ],
         "stats": record.stats(),
     }
+
+
+_RESPONSE_FIELDS = {"response_markdown", "response_document"}
+
+
+@router.get("/analyses/{analysis_id}/responses", tags=["analyses"])
+def get_model_responses(
+    analysis_id: str, service: PaperPilotService = Depends(get_service)
+) -> dict:
+    """Each model answer as written (Markdown) and as its parsed response document."""
+    record = service.get_analysis(analysis_id)
+    return {
+        "analysis_id": record.analysis_id,
+        "schema_version": SCHEMA_VERSION,
+        "agents": {
+            name: {
+                "status": result.status,
+                "attempt": result.attempt,
+                "response_markdown": result.response_markdown,
+                "response_document": result.response_document,
+            }
+            for name, result in record.agent_results.items()
+        },
+        "verification": [
+            {
+                "claim": v.claim,
+                "status": v.status.value,
+                "response_markdown": v.response_markdown,
+                "response_document": v.response_document,
+            }
+            for v in record.verification_results
+        ],
+    }
+
+
+@router.get("/schemas/response-document", tags=["system"])
+def get_response_document_schema() -> dict:
+    """JSON Schema of the document every model answer is parsed into."""
+    return response_document_json_schema()
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)

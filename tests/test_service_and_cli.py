@@ -160,6 +160,26 @@ def test_service_emits_progress_events_to_a_sink(service, paper_pdf):
     assert {"ingestion", "report"} <= {e.stage for e in seen}
 
 
+def test_polling_mid_run_sees_live_events(service, paper_pdf):
+    metadata = service.register_local_file(paper_pdf)
+    record = service.create_analysis(metadata.document_id)
+    snapshots = {}
+
+    def peek(event):
+        if event.stage == "verification" and event.status == "started":
+            mid = service.get_analysis(record.analysis_id)
+            snapshots["status"] = mid.status
+            snapshots["stages"] = {e.stage for e in mid.events}
+
+    service.run_analysis(record.analysis_id, event_sink=peek)
+
+    assert snapshots["status"] is AnalysisStatus.VERIFYING
+    assert {"ingestion", "planning"} <= snapshots["stages"]
+    finished = service.get_analysis(record.analysis_id)
+    assert finished.status is AnalysisStatus.COMPLETED
+    assert not service._live_events
+
+
 def test_service_updates_document_metadata_after_ingestion(service, paper_pdf):
     record = service.analyze_file(paper_pdf)
     metadata = service.get_document(record.document_id)
@@ -292,3 +312,10 @@ def test_cli_warns_when_the_mock_provider_is_active(tmp_path, paper_pdf, capsys)
         ]
     )
     assert "mock provider" in capsys.readouterr().err
+
+
+def test_a_blank_reasoning_effort_means_unset(monkeypatch):
+    from paperpilot.config import settings_from_env
+
+    monkeypatch.setenv("PAPERPILOT_LLM_REASONING_EFFORT", "")
+    assert settings_from_env().llm_reasoning_effort is None

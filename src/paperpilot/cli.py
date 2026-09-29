@@ -19,7 +19,7 @@ from .config import Settings, settings_from_env
 from .domain.enums import AnalysisStatus, FindingStatus
 from .domain.models import AnalysisRecord, ProgressEvent
 from .errors import PaperPilotError
-from .observability import configure_logging
+from .observability import configure_logging, resolve_format
 from .service import PaperPilotService
 
 EXIT_OK = 0
@@ -91,6 +91,10 @@ def _build_settings(args: argparse.Namespace) -> Settings:
         overrides["llm_model"] = args.model
     if getattr(args, "no_ocr", False):
         overrides["ocr_enabled"] = False
+    if getattr(args, "layout", False):
+        overrides["layout_enabled"] = True
+    elif getattr(args, "no_layout", False):
+        overrides["layout_enabled"] = False
     if getattr(args, "max_retries", None) is not None:
         overrides["max_retries"] = args.max_retries
     if getattr(args, "sequential", False):
@@ -107,7 +111,11 @@ def _build_settings(args: argparse.Namespace) -> Settings:
 
 def cmd_analyze(args: argparse.Namespace) -> int:
     settings = _build_settings(args)
-    configure_logging(settings.log_level, "text" if not args.json_logs else "json")
+    log_format = "json" if args.json_logs else settings.log_format
+    configure_logging(settings.log_level, log_format, http=settings.log_http)
+    # Readable logs already narrate every stage; the progress printer is for the
+    # JSON case, where logs are meant for machines.
+    readable_logs = resolve_format(log_format, sys.stderr) == "pretty"
 
     path = Path(args.pdf).expanduser()
     if not path.exists():
@@ -128,7 +136,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     printer = ProgressPrinter(quiet=args.quiet)
 
     try:
-        record = service.analyze_file(path, event_sink=printer)
+        record = service.analyze_file(path, event_sink=None if readable_logs else printer)
     except PaperPilotError as exc:
         print(f"error [{exc.code}]: {exc.message}", file=sys.stderr)
         return EXIT_BAD_INPUT if exc.http_status < 500 else EXIT_FAILED
@@ -237,6 +245,33 @@ def cmd_report(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_schema(args: argparse.Namespace) -> int:
+    from .response import response_document_json_schema
+
+    text = json.dumps(response_document_json_schema(), indent=2) + "\n"
+    if args.output:
+        Path(args.output).write_text(text, encoding="utf-8")
+    else:
+        print(text, end="")
+    return EXIT_OK
+
+
+def cmd_parse(args: argparse.Namespace) -> int:
+    from .response import parse_markdown
+
+    if args.markdown == "-":
+        source = sys.stdin.read()
+    else:
+        path = Path(args.markdown)
+        if not path.exists():
+            print(f"error: file not found: {path}", file=sys.stderr)
+            return EXIT_BAD_INPUT
+        source = path.read_text(encoding="utf-8")
+    document = parse_markdown(source)
+    print(json.dumps(document.model_dump(mode="json", exclude_none=True), indent=2))
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="paperpilot",
@@ -248,10 +283,19 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     def common(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--provider", choices=["mock", "openai_compatible"], help="LLM provider")
+        p.add_argument("--provider", choices=["mock", "openai_compatible", "huggingface"], help="LLM provider")
         p.add_argument("--model", help="model name to use")
         p.add_argument("--data-dir", help="directory for the database, uploads and reports")
         p.add_argument("--no-ocr", action="store_true", help="disable the OCR fallback")
+        layout = p.add_mutually_exclusive_group()
+        layout.add_argument(
+            "--layout",
+            action="store_true",
+            help='analyse page layout with PP-Structure (needs the "layout" extra)',
+        )
+        layout.add_argument(
+            "--no-layout", action="store_true", help="skip layout analysis even if enabled"
+        )
         p.add_argument("-v", "--verbose", action="store_true", help="debug logging")
         p.add_argument("-q", "--quiet", action="store_true", help="suppress progress output")
         p.add_argument("--json-logs", action="store_true", help="emit logs as JSON")
@@ -285,6 +329,14 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("analysis_id")
     common(report)
     report.set_defaults(func=cmd_report)
+
+    schema = sub.add_parser("schema", help="print the JSON Schema of parsed model responses")
+    schema.add_argument("-o", "--output", help="write the schema here instead of stdout")
+    schema.set_defaults(func=cmd_schema)
+
+    parse = sub.add_parser("parse", help="parse a Markdown file into the response-document JSON")
+    parse.add_argument("markdown", help="path to a Markdown file, or - for stdin")
+    parse.set_defaults(func=cmd_parse)
 
     return parser
 

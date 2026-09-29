@@ -42,7 +42,7 @@ def create_app(
 ) -> FastAPI:
     """Build the application. Dependencies are injectable so tests stay hermetic."""
     settings = settings or get_settings()
-    configure_logging(settings.log_level, settings.log_format)
+    configure_logging(settings.log_level, settings.log_format, http=settings.log_http)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -50,6 +50,7 @@ def create_app(
             "api.startup",
             version=__version__,
             llm_provider=settings.llm_provider,
+            llm_model=None if settings.llm_provider == "mock" else settings.llm_model,
             embedding_provider=settings.embedding_provider,
         )
         yield

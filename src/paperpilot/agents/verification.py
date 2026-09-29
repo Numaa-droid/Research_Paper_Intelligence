@@ -17,7 +17,6 @@ paper is not in the paper, however confident the model sounds.
 from __future__ import annotations
 
 import time
-from typing import Any
 
 from ..domain.enums import CitationQuality, FindingStatus
 from ..domain.models import (
@@ -31,11 +30,14 @@ from ..domain.models import (
 from ..errors import ProviderError
 from ..observability import info, warning
 from ..providers.llm import LLMProvider, LLMRequest
+from ..response import parse_markdown
+from ..response.reader import DocumentReader, clean_text, parse_score, section_blocks
+from ..response.schema import ListBlock, MathBlock, ParagraphBlock
 from ..retrieval.retriever import RetrievalQuery, RetrievalResult
 from ..validation.evidence import validate_evidence
 from ..validation.numeric import check_claim_numbers, extract_numbers, numeric_accuracy
-from ..validation.schema import clamp_confidence, coerce_status
-from .base import AgentContext, format_context, format_metadata
+from .base import AgentContext, evidence_payload, format_context, format_metadata
+from .grounding import Grounder, SourceMap, parse_status, resolve_source_labels
 from .prompts.registry import VERIFICATION
 
 #: Claims at or above this impact are always verified.
@@ -199,7 +201,6 @@ class VerificationAgent:
         # --- model layer ---------------------------------------------------
         try:
             response = self._call_model(candidate, context, retrieved, numeric_checks)
-            payload = response.content
             self.usage.append(
                 AgentUsage(
                     agent=self.name,
@@ -228,12 +229,39 @@ class VerificationAgent:
                 attempt=context.attempt,
             )
 
-        status = coerce_status(payload.get("status"), FindingStatus.UNKNOWN)
-        confidence = clamp_confidence(payload.get("confidence"), 0.5)
-        explanation = str(payload.get("explanation") or "").strip()
+        document = parse_markdown(response.text)
+        reader = DocumentReader(document)
+        grounder = Grounder(sources=SourceMap(retrieved), index=context.index, agent=self.name)
 
-        supporting = self._parse_and_validate(payload.get("supporting_evidence"), context)
-        contradicting = self._parse_and_validate(payload.get("contradicting_evidence"), context)
+        verdict = reader.fields(reader.section("verdict")) or {
+            key: item for section in document.sections for key, item in reader.fields(section).items()
+        }
+        status = parse_status(reader.field_text(verdict, "status", "verdict"))
+        score = parse_score(reader.field_text(verdict, "confidence"))
+        confidence = 0.5 if score is None else score
+        explanation_section = reader.section("explanation", "reasoning", "rationale")
+        # Paragraphs *and* list items: a verifier that lists its evidence as bullets
+        # otherwise leaves "supported by the following evidence:" pointing at nothing.
+        parts: list[str] = []
+        for block in section_blocks(explanation_section) if explanation_section else []:
+            if isinstance(block, ParagraphBlock | MathBlock):
+                parts.append(block.text)
+            elif isinstance(block, ListBlock):
+                parts.extend(f"- {item.text}" for item in block.items)
+        explanation = clean_text(
+            resolve_source_labels("\n".join(p for p in parts if p.strip()), grounder.sources)
+        ) or reader.text(explanation_section)
+
+        supporting = self._validated(
+            grounder.evidence_list(reader.quotes(reader.section("supporting evidence", "support"))),
+            context,
+        )
+        contradicting = self._validated(
+            grounder.evidence_list(
+                reader.quotes(reader.section("contradicting evidence", "contradiction"))
+            ),
+            context,
+        )
 
         # --- reconciliation: deterministic checks cap the model's verdict ---
         if status in (FindingStatus.SUPPORTED, FindingStatus.PARTIALLY_SUPPORTED):
@@ -293,6 +321,8 @@ class VerificationAgent:
             numeric_checks=numeric_checks,
             deterministic_notes=deterministic_notes,
             attempt=context.attempt,
+            response_markdown=response.text,
+            response_document=document.model_dump(mode="json", exclude_none=True),
         )
         info(
             "verification.claim",
@@ -338,7 +368,7 @@ class VerificationAgent:
             metadata=format_metadata(context.metadata),
             claim=candidate.claim,
             source_agent=candidate.source_agent,
-            context=format_context(retrieved),
+            context=format_context(retrieved, index=context.index),
             numeric_report=_format_numeric_report(numeric_checks),
         )
         request = LLMRequest(
@@ -347,30 +377,18 @@ class VerificationAgent:
             system=self.prompt.system,
             user=user,
             prompt_version=self.prompt.version,
-            evidence=[r.to_dict() for r in retrieved],
+            evidence=evidence_payload(retrieved),
             context={
                 "claim": candidate.claim,
                 "source_agent": candidate.source_agent,
                 "numeric_checks": [c.model_dump(mode="json") for c in numeric_checks],
             },
         )
-        return self.provider.generate_json(request)
+        return self.provider.generate(request)
 
     @staticmethod
-    def _parse_and_validate(items: Any, context: AgentContext) -> list[Evidence]:
-        from ..validation.schema import parse_evidence
-
-        if not isinstance(items, list):
-            return []
-        evidence: list[Evidence] = []
-        for item in items:
-            parsed = parse_evidence(item, agent="verification")
-            if parsed is None:
-                continue
-            report = validate_evidence(parsed, context.index)
-            if report.ok:
-                evidence.append(parsed)
-        return evidence
+    def _validated(evidence: list[Evidence], context: AgentContext) -> list[Evidence]:
+        return [e for e in evidence if validate_evidence(e, context.index).ok]
 
 
 def apply_verification(

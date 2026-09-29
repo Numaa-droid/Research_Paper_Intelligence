@@ -105,6 +105,25 @@ def test_math_analysis_is_conditional_and_explained(analysis):
     assert "equation" in analysis.plan.rationale["run_math"]
 
 
+def test_every_content_chunk_was_read_by_a_model(analysis):
+    """Specialists plus the coverage sweep leave no part of the paper unread."""
+    coverage = analysis.agent_results.get("coverage")
+    assert coverage is not None
+    read = {
+        chunk_id
+        for result in analysis.agent_results.values()
+        if result.status == "ok"
+        for chunk_id in result.context_chunk_ids
+    }
+    if coverage.status == "skipped":
+        return  # the specialists alone read everything
+    data = coverage.payload
+    assert data["read_by_specialists"] + data["read_by_sweep"] == data["content_chunks"]
+    assert data["unread_sections"] == []
+    assert set(coverage.context_chunk_ids) <= read
+    assert "Details from the rest of the paper" in analysis.report_markdown
+
+
 def test_math_skip_is_reported_when_a_paper_has_no_mathematics(tmp_path):
     """The complementary branch: a paper without maths must skip the agent."""
     from tests.conftest import _context_for, _index_from_texts  # noqa: PLC0415

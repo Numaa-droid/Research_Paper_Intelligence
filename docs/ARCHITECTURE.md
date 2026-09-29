@@ -52,18 +52,46 @@ API / CLI  ──────────────────► application
         └──────────────┴──────────────┴──────────────┴──────────────┘
                                       │
                                       ▼
-                 adapters: storage · model provider · embeddings · OCR
+          adapters: storage · model provider · embeddings · OCR · layout
 ```
 
 Dependencies point inwards. The domain models know nothing about FastAPI,
 SQLite, PyMuPDF or any model provider. Every outward dependency sits behind an
-interface (`LLMProvider`, `EmbeddingProvider`, `OCREngine`, `Retriever`,
+interface (`LLMProvider`, `EmbeddingProvider`, `OCREngine`, `LayoutEngine`,
+`Retriever`,
 `DocumentRepository`, `AnalysisRepository`, `FileStorage`, `TaskRunner`), which
 is what makes the whole suite runnable with no credentials and no network.
 
 ---
 
 ## Decisions worth defending
+
+### Why layout analysis is optional, and why it is pinned
+
+PyMuPDF reports the blocks a PDF's content stream declares, not the blocks a
+reader sees. On a two-column journal template it routinely fuses a section
+heading, the paragraph under it and a figure caption into one object, and no
+amount of typographic reasoning can find a heading inside a 1,157-character
+block. Line geometry recovers most of it — a heading starts at the column edge,
+justified body text fills the measure on every line but its last — and that path
+has no dependencies, so it is the default.
+
+Where geometry is not enough, `LayoutEngine` asks a model what the page
+contains. PP-Structure returns typed regions (`title`, `text`, `table`,
+`figure`, `header`, `footer`, `caption`), and the chunker re-cuts the text
+blocks along them: a title region makes a heading regardless of how it was set,
+a header or footer region drops its lines as page furniture, and a caption is
+separated from the prose beneath it.
+
+The cost is a rasterise and a model pass per page, which is why it is off by
+default. The constraint is that **a parse must not change under the caller**, so
+the engine is pinned on every axis that could drift: one CPU thread and fixed
+seeds, a pinned model name, a fixed DPI (detections are computed in pixels),
+coordinates quantised before anything sorts, compares or hashes them, a total
+order over regions that never depends on detection order, and a cache keyed by
+the page image together with the full engine configuration. The cache makes
+repeated runs cheap; it is not what makes them identical. With it disabled the
+same page still yields the same regions, which is what the test suite asserts.
 
 ### Why a hand-written state graph instead of LangGraph
 
@@ -98,6 +126,43 @@ handful of targeted retrieval queries and receives a bounded context
 (`MAX_CONTEXT_CHARS`). That is cheaper, but more importantly it is what makes
 citations checkable: an agent that was handed chunk `page-4-chunk-03` and quotes
 from it can be audited; an agent handed 40 pages cannot.
+
+### Why a coverage sweep follows the specialists
+
+Targeted retrieval has a cost: content that no query or heading hint selects is
+never read. On *Attention Is All You Need* the four specialists together were
+shown about two thirds of the paper; the hardware schedule, the regularisation
+paragraph continued past a page break, the complexity table and most of the
+decoding settings reached no model, so the report could not contain them.
+
+Which chunks were missed is not a judgement call. Every agent records the chunks
+its prompt actually contained (`AgentResult.context_chunk_ids`), so the unread
+content is a set difference. The `coverage` node splits it, in document order and
+without separating a caption from its table, into prompt-sized batches and reads
+each one (`agents/coverage.py`). The same paper and the same specialist contexts
+always produce the same sweep; the report's section 14 states how many content
+chunks each stage read, and lists any section left unread because
+`PAPERPILOT_COVERAGE_MAX_BATCHES` ran out.
+
+### Why tables are rebuilt from cell geometry
+
+PyMuPDF returns a ruled table as one block per cell, which reads as a column of
+unlabelled numbers and was chunked as prose together with whatever followed the
+table. The caption-and-rule detector locates the table region; within it, cells
+are grouped into rows by vertical centre and assigned to column bands taken from
+the fullest rows, and header rows (those above the first numeric row) are merged
+so a spanning header names every column under it. The result is a Markdown grid
+whose every value is still the text layer's own, now in its row and column. A
+region that does not form a grid of at least two multi-cell rows is left alone.
+
+### Why reported values are located, and cross-checked, without a model
+
+A reported number is accepted when it appears on one line of the paper together
+with the name of what it measures — a table row naming the system is the
+strongest such line (`validation/values.py`). The same machinery finds papers
+that contradict themselves: a value stated in prose for a reported metric, close
+to but different from the reported result and present in no table, is surfaced
+with both locations (`validation/consistency.py`) rather than silently resolved.
 
 ### Why the planner cannot enable an agent
 
@@ -136,6 +201,37 @@ So the reconciliation is asymmetric: a check can downgrade `supported` to
 checks reject. A "supported" verdict with no verifiable quote becomes
 `unsupported`, and the reason is recorded.
 
+### Why attribution and paper kind are decided without a model
+
+A verbatim quote proves the words are in the paper, not that the finding is the
+paper's. "In [20] the authors found X" is a real quote of work [20]'s finding.
+`paperpilot.discourse` reads the paper once, in document order, and marks every
+sentence as the paper's own voice or as *reporting* a cited work. The
+attribution opens on wording like "In [N] the authors", "According to [N]" or
+"Smith et al. [N] show", carries over "They found" and "According to them", and
+ends at "we"/"this article", a new section or a new citation. From that map it
+derives:
+
+* **the paper kind** (`empirical`, `review`, `theoretical`, `conceptual`) from
+  the title, the share of reporting sentences and own-voice experiment wording.
+  The kind selects the agents' reference guides (`agents/specs/*.yaml`), the
+  report's section framing and, for reviews, a protocol checklist in place of
+  the dataset/baseline checklist;
+* **a `REPORTS CITED WORK [N]` tag** on each context chunk, so the models can
+  tell the two voices apart;
+* **the attribution of every finding and result row**, which the report prints
+  ("reported from cited work [20]"). A cited finding is never listed as a
+  contribution, a claim that credits the paper with one is capped at
+  `partially_supported`, and so is a claim using wording the paper never uses.
+
+These caps run in `validation/reconcile.py` after the verifier, so they have the
+last word, and they are idempotent across retries. Near-duplicate findings are
+merged before verification (`validation/dedupe.py`).
+
+The rules are about how academic prose is written, not about any one paper. A
+misfire is fixed in the rule and covered by a generic test in
+`tests/test_discourse.py`, never by a per-paper exception.
+
 ### Why the report synthesizer makes no model call
 
 The final artefact is rendered deterministically from validated structures. It is
@@ -147,7 +243,7 @@ render the same way.
 
 ### Why failures are shown rather than removed
 
-Section 11 of every report lists what could not be grounded, with the reason and
+Section 12 of every report lists what could not be grounded, with the reason and
 any numbers that were not found. Dropping those claims would produce a cleaner
 document that silently hid the system's failures. The unsupported-claim rate is a
 headline evaluation metric for the same reason.
@@ -195,9 +291,12 @@ with like.
 
 Following a single claim from model output to printed citation:
 
-1. **Summary Agent** returns JSON containing a claim and an evidence object.
-2. `parse_finding` coerces it into typed models. Evidence with a non-integer page
-   or an empty quote is **dropped**, not defaulted.
+1. **Summary Agent** answers in Markdown: a `### Finding` with `- Claim:` and
+   `- Status:` bullets and a `> [S3] quote` blockquote.
+2. `parse_markdown` turns the answer into a response document, and
+   `parse_findings` reads the finding out of it. The `[S3]` label resolves to the
+   chunk it names, which supplies page, section and element id; a quote with no
+   resolvable source and no match in the paper is **dropped**, not defaulted.
 3. `validate_evidence` resolves the owning chunk (even when the agent did not say
    which), checks the page is in range, matches the quote in tiers, corrects the
    section label from the index, and drops an element id that does not belong to

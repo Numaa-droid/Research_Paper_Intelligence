@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import BinaryIO
 
 from .config import Settings, get_settings
-from .domain.enums import AnalysisStatus
-from .domain.models import AnalysisRecord, PaperMetadata
+from .domain.enums import TERMINAL_STATUSES, AnalysisStatus
+from .domain.models import AnalysisRecord, PaperMetadata, ProgressEvent
 from .domain.state import ResearchState, new_state
 from .errors import NotFoundError, ValidationError
 from .ingestion.pdf_parser import validate_pdf_file
@@ -55,7 +55,9 @@ class PaperPilotService:
     ) -> None:
         self.settings = settings or get_settings()
         self.settings.ensure_directories()
-        configure_logging(self.settings.log_level, self.settings.log_format)
+        configure_logging(
+            self.settings.log_level, self.settings.log_format, http=self.settings.log_http
+        )
 
         if documents is None or analyses is None:
             connection = SQLiteConnection(self.settings.sqlite_path)
@@ -73,6 +75,9 @@ class PaperPilotService:
         #: Paths of files analysed in place (CLI), which are not copied into
         #: the upload directory.
         self._local_paths: dict[str, Path] = {}
+        #: Events of runs still in flight. The record is only persisted when a
+        #: run finishes, so polling merges these in to show live progress.
+        self._live_events: dict[str, list[ProgressEvent]] = {}
 
     # --- documents --------------------------------------------------------
 
@@ -142,6 +147,11 @@ class PaperPilotService:
         record = self.analyses.get(analysis_id)
         if record is None:
             raise NotFoundError(f"unknown analysis: {analysis_id}")
+        with self._lock:
+            live = list(self._live_events.get(analysis_id, ()))
+        if live and record.status not in TERMINAL_STATUSES:
+            record.events = live
+            record.status = _status_for_stage(live[-1].stage, record.status)
         return record
 
     def get_report(self, analysis_id: str) -> str:
@@ -163,7 +173,17 @@ class PaperPilotService:
         file_path = self.resolve_path(record.document_id)
         started = time.perf_counter()
 
-        recorder = EventRecorder(sink=event_sink)
+        with self._lock:
+            live = self._live_events[analysis_id] = []
+
+        def sink(event: ProgressEvent) -> None:
+            # Specialist agents emit from worker threads.
+            with self._lock:
+                live.append(event)
+            if event_sink is not None:
+                event_sink(event)
+
+        recorder = EventRecorder(sink=sink)
         resources = WorkflowResources(
             settings=self.settings,
             llm=self.llm,
@@ -184,10 +204,19 @@ class PaperPilotService:
             file_path=str(file_path),
         )
 
-        with log_context(analysis_id=analysis_id, document_id=record.document_id):
-            final = workflow.run(state)
-
-        return self._persist(record, final, started)
+        try:
+            with log_context(analysis_id=analysis_id, document_id=record.document_id):
+                info(
+                    "service.analysis_started",
+                    paper=file_path.name.split("__", 1)[-1],
+                    llm_provider=self.settings.llm_provider,
+                    llm_model=None if self.settings.llm_provider == "mock" else self.settings.llm_model,
+                )
+                final = workflow.run(state)
+            return self._persist(record, final, started)
+        finally:
+            with self._lock:
+                self._live_events.pop(analysis_id, None)
 
     def analyze_file(
         self, file_path: str | Path, *, event_sink: EventSink | None = None
@@ -219,6 +248,7 @@ class PaperPilotService:
             report = state.get("final_report")
             if report:
                 path = self.files.save_report(record.analysis_id, report)
+                info("report.saved", analysis_id=record.analysis_id, path=str(path), chars=len(report))
                 record.report_markdown = report
                 record.report_path = str(path)
                 record.completed_at = datetime.now(UTC)
@@ -237,6 +267,28 @@ class PaperPilotService:
             analysis_id=record.analysis_id,
             status=record.status.value,
             findings=len(record.findings),
+            verified_claims=len(record.verification_results),
+            tokens=sum(u.total_tokens for u in record.usage),
+            cost_usd=round(sum(u.estimated_cost_usd or 0.0 for u in record.usage), 6) or None,
+            retries=record.retry_count,
             duration_s=record.duration_seconds,
         )
         return record
+
+
+_STAGE_STATUS = {
+    "ingestion": AnalysisStatus.INGESTING,
+    "indexing": AnalysisStatus.INDEXING,
+    "planning": AnalysisStatus.PLANNING,
+    "aggregation": AnalysisStatus.ANALYZING,
+    "verification": AnalysisStatus.VERIFYING,
+    "retry": AnalysisStatus.RETRYING,
+    "report": AnalysisStatus.SYNTHESIZING,
+}
+
+
+def _status_for_stage(stage: str, default: AnalysisStatus) -> AnalysisStatus:
+    """Coarse run status implied by the most recent progress event."""
+    if stage.startswith("agent:"):
+        return AnalysisStatus.ANALYZING
+    return _STAGE_STATUS.get(stage, default)

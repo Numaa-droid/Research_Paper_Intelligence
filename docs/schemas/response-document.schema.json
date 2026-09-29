@@ -1,0 +1,1135 @@
+{
+  "$defs": {
+    "BlockquoteBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Plain text, Markdown syntax removed, citation markers kept.",
+          "title": "Text",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "Source Markdown, verbatim.",
+          "title": "Markdown",
+          "type": "string"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "type": {
+          "const": "blockquote",
+          "default": "blockquote",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "blockquote": "#/$defs/BlockquoteBlock",
+                "code": "#/$defs/CodeBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "html": "#/$defs/HtmlBlock",
+                "list": "#/$defs/ListBlock",
+                "math": "#/$defs/MathBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "table": "#/$defs/TableBlock",
+                "thematic_break": "#/$defs/ThematicBreakBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/ListBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/BlockquoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/MathBlock"
+              },
+              {
+                "$ref": "#/$defs/ThematicBreakBlock"
+              },
+              {
+                "$ref": "#/$defs/HtmlBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text",
+        "markdown",
+        "id"
+      ],
+      "title": "BlockquoteBlock",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "description": "A reference to one retrieved source, e.g. ``[S3]``.",
+      "properties": {
+        "label": {
+          "description": "Normalised source label, e.g. 'S3'.",
+          "title": "Label",
+          "type": "string"
+        },
+        "raw": {
+          "description": "The marker exactly as written, e.g. '[S3, S4]'.",
+          "title": "Raw",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "raw"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "CodeBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "code",
+          "default": "code",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "text": {
+          "description": "Code exactly as written.",
+          "title": "Text",
+          "type": "string"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "CodeBlock",
+      "type": "object"
+    },
+    "DocumentStats": {
+      "additionalProperties": false,
+      "properties": {
+        "sections": {
+          "default": 0,
+          "title": "Sections",
+          "type": "integer"
+        },
+        "paragraphs": {
+          "default": 0,
+          "title": "Paragraphs",
+          "type": "integer"
+        },
+        "lists": {
+          "default": 0,
+          "title": "Lists",
+          "type": "integer"
+        },
+        "list_items": {
+          "default": 0,
+          "title": "List Items",
+          "type": "integer"
+        },
+        "tables": {
+          "default": 0,
+          "title": "Tables",
+          "type": "integer"
+        },
+        "table_cells": {
+          "default": 0,
+          "title": "Table Cells",
+          "type": "integer"
+        },
+        "blockquotes": {
+          "default": 0,
+          "title": "Blockquotes",
+          "type": "integer"
+        },
+        "code_blocks": {
+          "default": 0,
+          "title": "Code Blocks",
+          "type": "integer"
+        },
+        "math_blocks": {
+          "default": 0,
+          "title": "Math Blocks",
+          "type": "integer"
+        },
+        "citations": {
+          "default": 0,
+          "title": "Citations",
+          "type": "integer"
+        }
+      },
+      "title": "DocumentStats",
+      "type": "object"
+    },
+    "HeadingBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Plain text, Markdown syntax removed, citation markers kept.",
+          "title": "Text",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "Source Markdown, verbatim.",
+          "title": "Markdown",
+          "type": "string"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "type": {
+          "const": "heading",
+          "default": "heading",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "level": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        },
+        "implicit": {
+          "default": false,
+          "description": "True when the heading was written as a bold-only paragraph (**Title**).",
+          "title": "Implicit",
+          "type": "boolean"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text",
+        "markdown",
+        "id",
+        "level"
+      ],
+      "title": "HeadingBlock",
+      "type": "object"
+    },
+    "HtmlBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "html",
+          "default": "html",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "HtmlBlock",
+      "type": "object"
+    },
+    "ListBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "list",
+          "default": "list",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ordered": {
+          "title": "Ordered",
+          "type": "boolean"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ListItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "ordered"
+      ],
+      "title": "ListBlock",
+      "type": "object"
+    },
+    "ListItem": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Plain text, Markdown syntax removed, citation markers kept.",
+          "title": "Text",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "Source Markdown, verbatim.",
+          "title": "Markdown",
+          "type": "string"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "index": {
+          "description": "0-based position in its list.",
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Printed number in an ordered list.",
+          "title": "Number"
+        },
+        "checked": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Task-list state, if any.",
+          "title": "Checked"
+        },
+        "key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For 'Key: value' items, the key as written (bold removed).",
+          "title": "Key"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For 'Key: value' items, the value.",
+          "title": "Value"
+        },
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "blockquote": "#/$defs/BlockquoteBlock",
+                "code": "#/$defs/CodeBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "html": "#/$defs/HtmlBlock",
+                "list": "#/$defs/ListBlock",
+                "math": "#/$defs/MathBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "table": "#/$defs/TableBlock",
+                "thematic_break": "#/$defs/ThematicBreakBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/ListBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/BlockquoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/MathBlock"
+              },
+              {
+                "$ref": "#/$defs/ThematicBreakBlock"
+              },
+              {
+                "$ref": "#/$defs/HtmlBlock"
+              }
+            ]
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text",
+        "markdown",
+        "index"
+      ],
+      "title": "ListItem",
+      "type": "object"
+    },
+    "MathBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "math",
+          "default": "math",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "description": "Math source exactly as written, delimiters removed.",
+          "title": "Text",
+          "type": "string"
+        },
+        "delimiter": {
+          "enum": [
+            "$$",
+            "\\["
+          ],
+          "title": "Delimiter",
+          "type": "string"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "delimiter"
+      ],
+      "title": "MathBlock",
+      "type": "object"
+    },
+    "ParagraphBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Plain text, Markdown syntax removed, citation markers kept.",
+          "title": "Text",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "Source Markdown, verbatim.",
+          "title": "Markdown",
+          "type": "string"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "type": {
+          "const": "paragraph",
+          "default": "paragraph",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text",
+        "markdown",
+        "id"
+      ],
+      "title": "ParagraphBlock",
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": false,
+      "description": "A heading and everything under it up to the next heading of its level.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "heading": {
+          "title": "Heading",
+          "type": "string"
+        },
+        "key": {
+          "description": "Normalised heading used for lookups; numbering removed.",
+          "title": "Key",
+          "type": "string"
+        },
+        "level": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        },
+        "path": {
+          "description": "Headings from the outermost section down to this one.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Path",
+          "type": "array"
+        },
+        "implicit": {
+          "default": false,
+          "title": "Implicit",
+          "type": "boolean"
+        },
+        "blocks": {
+          "description": "Content before the first subsection.",
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "blockquote": "#/$defs/BlockquoteBlock",
+                "code": "#/$defs/CodeBlock",
+                "heading": "#/$defs/HeadingBlock",
+                "html": "#/$defs/HtmlBlock",
+                "list": "#/$defs/ListBlock",
+                "math": "#/$defs/MathBlock",
+                "paragraph": "#/$defs/ParagraphBlock",
+                "table": "#/$defs/TableBlock",
+                "thematic_break": "#/$defs/ThematicBreakBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/HeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/ParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/ListBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/BlockquoteBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              },
+              {
+                "$ref": "#/$defs/MathBlock"
+              },
+              {
+                "$ref": "#/$defs/ThematicBreakBlock"
+              },
+              {
+                "$ref": "#/$defs/HtmlBlock"
+              }
+            ]
+          },
+          "title": "Blocks",
+          "type": "array"
+        },
+        "subsections": {
+          "items": {
+            "$ref": "#/$defs/Section"
+          },
+          "title": "Subsections",
+          "type": "array"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "heading",
+        "key",
+        "level",
+        "path"
+      ],
+      "title": "Section",
+      "type": "object"
+    },
+    "SourceSpan": {
+      "additionalProperties": false,
+      "description": "Lines of the Markdown source a node came from (1-based, inclusive).",
+      "properties": {
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
+          "type": "integer"
+        },
+        "line_end": {
+          "minimum": 1,
+          "title": "Line End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line_start",
+        "line_end"
+      ],
+      "title": "SourceSpan",
+      "type": "object"
+    },
+    "TableBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "table",
+          "default": "table",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "column_count": {
+          "minimum": 0,
+          "title": "Column Count",
+          "type": "integer"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/TableColumn"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/TableRow"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "column_count",
+        "row_count"
+      ],
+      "title": "TableBlock",
+      "type": "object"
+    },
+    "TableCell": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Plain text, Markdown syntax removed, citation markers kept.",
+          "title": "Text",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "Source Markdown, verbatim.",
+          "title": "Markdown",
+          "type": "string"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "row_index": {
+          "minimum": 0,
+          "title": "Row Index",
+          "type": "integer"
+        },
+        "column_index": {
+          "minimum": 0,
+          "title": "Column Index",
+          "type": "integer"
+        },
+        "column_header": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column Header"
+        },
+        "row_header": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Header"
+        },
+        "value": {
+          "description": "Cell text with citation markers removed.",
+          "title": "Value",
+          "type": "string"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Numeric value when the cell is a single number.",
+          "title": "Number"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Trailing unit of a numeric cell, e.g. '%'.",
+          "title": "Unit"
+        },
+        "strong": {
+          "default": false,
+          "description": "Whole cell was bold (often 'best result').",
+          "title": "Strong",
+          "type": "boolean"
+        },
+        "empty": {
+          "default": false,
+          "title": "Empty",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "markdown",
+        "row_index",
+        "column_index",
+        "value"
+      ],
+      "title": "TableCell",
+      "type": "object"
+    },
+    "TableColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "column_index": {
+          "minimum": 0,
+          "title": "Column Index",
+          "type": "integer"
+        },
+        "header": {
+          "description": "Header text, plain.",
+          "title": "Header",
+          "type": "string"
+        },
+        "markdown": {
+          "title": "Markdown",
+          "type": "string"
+        },
+        "key": {
+          "description": "Normalised header used for lookups, e.g. 'metric name'.",
+          "title": "Key",
+          "type": "string"
+        },
+        "alignment": {
+          "anyOf": [
+            {
+              "enum": [
+                "left",
+                "center",
+                "right"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alignment"
+        }
+      },
+      "required": [
+        "column_index",
+        "header",
+        "markdown",
+        "key"
+      ],
+      "title": "TableColumn",
+      "type": "object"
+    },
+    "TableRow": {
+      "additionalProperties": false,
+      "properties": {
+        "row_index": {
+          "minimum": 0,
+          "title": "Row Index",
+          "type": "integer"
+        },
+        "row_header": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Header"
+        },
+        "cells": {
+          "items": {
+            "$ref": "#/$defs/TableCell"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "row_index"
+      ],
+      "title": "TableRow",
+      "type": "object"
+    },
+    "ThematicBreakBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "thematic_break",
+          "default": "thematic_break",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "span": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSpan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ThematicBreakBlock",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A model's Markdown answer as structured, deterministic JSON.",
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "preamble": {
+      "description": "Content before the first heading.",
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "blockquote": "#/$defs/BlockquoteBlock",
+            "code": "#/$defs/CodeBlock",
+            "heading": "#/$defs/HeadingBlock",
+            "html": "#/$defs/HtmlBlock",
+            "list": "#/$defs/ListBlock",
+            "math": "#/$defs/MathBlock",
+            "paragraph": "#/$defs/ParagraphBlock",
+            "table": "#/$defs/TableBlock",
+            "thematic_break": "#/$defs/ThematicBreakBlock"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/HeadingBlock"
+          },
+          {
+            "$ref": "#/$defs/ParagraphBlock"
+          },
+          {
+            "$ref": "#/$defs/ListBlock"
+          },
+          {
+            "$ref": "#/$defs/TableBlock"
+          },
+          {
+            "$ref": "#/$defs/BlockquoteBlock"
+          },
+          {
+            "$ref": "#/$defs/CodeBlock"
+          },
+          {
+            "$ref": "#/$defs/MathBlock"
+          },
+          {
+            "$ref": "#/$defs/ThematicBreakBlock"
+          },
+          {
+            "$ref": "#/$defs/HtmlBlock"
+          }
+        ]
+      },
+      "title": "Preamble",
+      "type": "array"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/Section"
+      },
+      "title": "Sections",
+      "type": "array"
+    },
+    "stats": {
+      "$ref": "#/$defs/DocumentStats"
+    },
+    "warnings": {
+      "description": "Repairs applied while parsing, in source order.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "title": "ResponseDocument",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://paperpilot.dev/schemas/response-document/1.0.json"
+}

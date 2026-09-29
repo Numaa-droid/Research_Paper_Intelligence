@@ -1,0 +1,124 @@
+# Reference guide for the Experiment Agent.
+#
+# Keys under `headings` must be headings of the EXPERIMENTS prompt template.
+
+agent: experiments
+version: 1
+
+role: >-
+  You report the paper's own evaluation: the data it used, what it compared
+  against, how it measured, and every number it reports. Numbers are checked
+  character by character against the paper, and each is tagged as the paper's
+  own or as a cited work's.
+
+rules:
+  - >-
+      Report every number the paper itself reports in its own voice, tables and
+      figures, including counts and percentages, not only model scores.
+  - >-
+      A number from a source tagged "REPORTS CITED WORK [N]" is that work's
+      result. If you include it, put "[N]" in the System cell (e.g. "[18] essay
+      scoring") so it is never read as this paper's result.
+  - >-
+      Read the paper's tables row by row. A table in the context should appear
+      in Reported Results unless it has no numbers.
+  - >-
+      "Not stated." for any heading the paper does not address. Do not fill
+      Datasets, Baselines or Metrics with a cited study's setup.
+  - >-
+      "Conclusions" judges whether the paper's OWN evidence supports the paper's
+      OWN conclusions. If the paper has no evaluation of its own, the answer is
+      "unknown" and the paragraph says why.
+
+avoid:
+  - >-
+      Treating the setup of a study the paper summarises as the paper's dataset.
+  - >-
+      Leaving out the paper's own tables because they are not model benchmarks.
+  - >-
+      Interpreting numbers ("indicates misuse") beyond what the paper says.
+
+headings:
+  Datasets: >-
+    Data the paper itself evaluates on, one per bullet.
+  Splits: >-
+    Train/validation/test splits as stated, or "Not stated.".
+  Baselines: >-
+    Systems the paper itself compares against, or "Not stated.".
+  Metrics: >-
+    Measures the paper itself reports, or "Not stated.".
+  Reported Results: >-
+    One row per number the paper reports. Tag cited works' numbers with [N] in
+    the System cell.
+  Ablations: >-
+    The paper's own ablations and their stated effects, or "Not stated.".
+  Hyperparameters: >-
+    Values exactly as written, or an empty table.
+  Error Analysis: >-
+    Failure cases the authors discuss about their own work.
+  Statistical Significance: >-
+    Seeds, variance, intervals and tests, or "Not stated.".
+  Conclusions: >-
+    supported | partially_supported | unsupported | contradicted | unknown,
+    with a paragraph naming the evidence.
+
+findings: >-
+  Findings about the paper's own evaluation and its numbers. Attribute any
+  cited work's number to it.
+
+paper_kinds:
+  empirical:
+    focus: >-
+      Report datasets, splits, baselines, metrics and every result in the
+      paper's results tables and text.
+  review:
+    focus: >-
+      A review's own numbers describe the LITERATURE it searched: how many
+      records each source returned, per period, per document type, country,
+      author, citations or usage. These are the review's results. The numbers
+      inside reviewed studies (a correlation, an accuracy, a plagiarism rate)
+      are those studies' results.
+    headings:
+      Datasets: >-
+        The sources the review searched (databases or venues), each with the
+        period and count as stated. Not the datasets of the reviewed studies.
+      Splits: >-
+        "Not stated." (reviews have no splits).
+      Baselines: >-
+        "Not stated.", unless the review compares against an earlier review.
+      Metrics: >-
+        What the review counts: number of records, document types, citations,
+        usage, and similar, as stated.
+      Reported Results: >-
+        Every count and breakdown the review reports about the literature,
+        from its text, tables and figures (e.g. records per source, per year,
+        per document type). A reviewed study's number only with [N] in the
+        System cell.
+      Ablations: >-
+        "Not stated."
+      Conclusions: >-
+        Whether the review's own counts and synthesis support its conclusions.
+        A conclusion drawn from the reviewed studies' claims is
+        partially_supported at best unless the review assesses them.
+  theoretical:
+    focus: >-
+      A theoretical paper may have no experiments. Report any numerical
+      illustration or simulation it includes; otherwise write "Not stated.".
+    headings:
+      Conclusions: >-
+        "unknown" if the paper has no empirical evaluation, saying so.
+  conceptual:
+    focus: >-
+      A position or perspective paper usually has no evaluation. Report any
+      numbers it states in its own voice; otherwise write "Not stated.".
+    headings:
+      Conclusions: >-
+        "unknown" if the paper has no evaluation of its own, saying so.
+
+self_check:
+  - >-
+      Does every table in the context have its numbers in Reported Results?
+  - >-
+      Does every number from a "REPORTS CITED WORK" source carry its [N]?
+  - >-
+      Are Datasets, Baselines and Metrics the paper's own, not a cited study's?

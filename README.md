@@ -45,8 +45,11 @@ flowchart TD
     ING --> PARSE["PyMuPDF extraction<br/>page boundaries preserved"]
     PARSE --> OCR{"Native text<br/>sufficient?"}
     OCR -- "no" --> TESS["OCR fallback<br/>(behind an interface)"]
-    OCR -- "yes" --> ELEM
-    TESS --> ELEM["Structure detection<br/>sections · tables · figures<br/>equations · references"]
+    OCR -- "yes" --> LAY
+    TESS --> LAY{"Layout analysis<br/>enabled?"}
+    LAY -- "yes" --> PPS["PP-Structure<br/>regions per page<br/>(deterministic, cached)"]
+    LAY -- "no" --> ELEM
+    PPS --> ELEM["Structure detection<br/>sections · tables · figures<br/>equations · references"]
     ELEM --> CHUNK["Page-aware chunking"]
     CHUNK --> IDX[("Paper intelligence index<br/>BM25 + dense + metadata")]
 
@@ -143,6 +146,28 @@ python -m paperpilot analyze ./papers/your-paper.pdf -o ./reports/out.md
 Any OpenAI-compatible endpoint works — hosted APIs, vLLM, LM Studio, or Ollama's
 compatibility layer — by changing `PAPERPILOT_LLM_BASE_URL`.
 
+For a local model through Ollama, e.g. `ollama pull qwen3.5:0.8b`:
+
+```bash
+# in .env:
+#   PAPERPILOT_LLM_PROVIDER=openai_compatible
+#   PAPERPILOT_LLM_BASE_URL=http://localhost:11434/v1
+#   PAPERPILOT_LLM_MODEL=qwen3.5:0.8b
+#   PAPERPILOT_LLM_REASONING_EFFORT=none   # thinking models otherwise return empty answers
+```
+
+To run an open-weights model from the Hugging Face Hub locally, with no API key:
+
+```bash
+pip install -e ".[local-llm]"
+# in .env:
+#   PAPERPILOT_LLM_PROVIDER=huggingface
+#   PAPERPILOT_LLM_MODEL=ibm-granite/granite-4.1-3b
+```
+
+The weights (~6 GB for a 3B model) download on first use and run on CUDA, Apple
+MPS or CPU (`PAPERPILOT_LLM_DEVICE`, default `auto`).
+
 ---
 
 ## CLI
@@ -163,6 +188,12 @@ python -m paperpilot serve --host 0.0.0.0 --port 8000
 
 # Print a stored report
 python -m paperpilot report analysis-abc123
+
+# Parse any Markdown model answer into the response-document JSON (no model call)
+python -m paperpilot parse answer.md
+
+# Print the JSON Schema of that document
+python -m paperpilot schema
 ```
 
 Progress is printed per stage to stderr, the report goes to stdout (or
@@ -190,6 +221,8 @@ POST /papers/{document_id}/analyze    start analysis        -> analysis_id (202)
 GET  /analyses/{analysis_id}          poll status and progress
 GET  /analyses/{analysis_id}/report   the Markdown report
 GET  /analyses/{analysis_id}/findings structured findings + verification
+GET  /analyses/{analysis_id}/responses every model answer: Markdown + parsed JSON document
+GET  /schemas/response-document       JSON Schema of the parsed model answer
 GET  /health                          liveness and configuration
 GET  /                                minimal web UI
 ```
@@ -309,6 +342,54 @@ paper is not in the paper, however confident the model sounds.
 | `inferred` | a reasonable reading, not stated by the authors |
 | `unknown` | verification could not be completed |
 
+### Model answers: Markdown in, deterministic JSON out
+
+Models never write JSON. A JSON answer fails the whole agent on one misplaced
+comma or a response cut off at the token limit, so every prompt instead asks for
+Markdown in a fixed layout — headings name fields, tables carry rows, blockquotes
+carry evidence:
+
+```markdown
+## Reported Results
+| System | Dataset | Metric | Value | Source | Quote |
+| --- | --- | --- | --- | --- | --- |
+| SRT-Large | NarrativeQA | F1 | 81.4 | [S3] |  |
+
+## Findings
+### Finding 1
+- Claim: SRT-Large reaches 81.4 F1 on NarrativeQA.
+- Status: supported
+> [S3] SRT-Large reaches 81.4 F1 while reducing attention FLOPs by 3.1x
+```
+
+`paperpilot.response.parse_markdown` turns that into a **response document**
+(CommonMark + GFM tables, via markdown-it). The same Markdown always yields the
+same JSON, and any text — even malformed or truncated — parses without raising:
+
+| Node | What it carries |
+| --- | --- |
+| `Section` | `heading`, normalised `key`, `level`, `path`, `blocks`, `subsections` |
+| `ParagraphBlock`, `ListItem` | `text`, verbatim `markdown`, `citations`; list items also `key`/`value` for `- Key: value` |
+| `TableBlock` | `columns` (`column_index`, `header`, `key`, `alignment`) and `rows` |
+| `TableCell` | `row_index`, `column_index`, `column_header`, `row_header` (first column), `value`, `number`, `unit`, `strong`, `citations` |
+| `BlockquoteBlock`, `CodeBlock`, `MathBlock` | source text kept verbatim, so quotes and equations are never altered by rendering |
+
+The JSON Schema is published at `docs/schemas/response-document.schema.json`
+(`paperpilot schema` regenerates it). Every agent result stores both
+`response_markdown` and `response_document`.
+
+Two further properties make this robust to real model output:
+
+- **Citations are labels, not locations.** The context block numbers each
+  retrieved chunk `S1`, `S2`, …; the model cites `[S3]` and page, section,
+  element id and chunk id are filled in from the index. A wrong label is
+  recovered by locating the quote in the paper, and noted.
+- **Tolerant, but never guessing.** Numbered or bold pseudo-headings, `**Key:**`
+  bullets, trailing citations, `80%`/`high` confidences and a code fence around
+  the whole answer are all read. A table row with an unescaped `|` keeps its text
+  (merged into the last column, with a warning) instead of losing cells. A field
+  that is absent is empty — it is never inferred.
+
 ### Deterministic validation
 
 None of the following is delegated to a model, because all of it has an exact
@@ -348,6 +429,7 @@ testable without credentials.
 | --- | --- |
 | `mock` (default) | Deterministic, offline. **Not a language model.** |
 | `openai_compatible` | Any OpenAI-compatible chat-completions endpoint |
+| `huggingface` | Open-weights Hub model run in-process with `transformers` |
 
 The mock is not a stub that returns fixed strings: it reads the retrieved
 evidence and builds answers out of verbatim sentences from it, so the real
@@ -414,14 +496,23 @@ Secrets are never logged — `Settings.redacted()` masks them.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PAPERPILOT_LLM_PROVIDER` | `mock` | `mock` or `openai_compatible` |
-| `PAPERPILOT_LLM_MODEL` | `gpt-4o-mini` | Model name |
+| `PAPERPILOT_LLM_PROVIDER` | `mock` | `mock`, `openai_compatible` or `huggingface` |
+| `PAPERPILOT_LLM_MODEL` | `gpt-4o-mini` | Model name, or Hub repo id for `huggingface` |
+| `PAPERPILOT_LLM_DEVICE` | `auto` | `huggingface` only: `auto`, `cpu`, `mps`, `cuda` |
 | `PAPERPILOT_LLM_BASE_URL` | OpenAI | Any compatible endpoint |
 | `PAPERPILOT_LLM_API_KEY` | — | Never commit this |
 | `PAPERPILOT_EMBEDDING_PROVIDER` | `hashing` | `hashing`, `openai_compatible`, `sentence_transformers` |
 | `PAPERPILOT_MAX_UPLOAD_MB` | `50` | Upload size limit |
-| `PAPERPILOT_OCR_ENABLED` | `true` | OCR fallback (needs Tesseract) |
+| `PAPERPILOT_OCR_ENABLED` | `true` | OCR fallback for scanned pages |
+| `PAPERPILOT_OCR_ENGINE` | `tesseract` | `tesseract` or `paddleocr_vl` |
+| `PAPERPILOT_OCR_BASE_URL` | `http://127.0.0.1:8080/v1` | `paddleocr_vl` only: llama-server endpoint |
+| `PAPERPILOT_OCR_FIGURES_ENABLED` | `true` | `paddleocr_vl` only: also read charts and diagrams on text pages |
+| `PAPERPILOT_OCR_TABLES_ENABLED` | `true` | `paddleocr_vl` only: re-read tables for their headers and cell grid |
 | `PAPERPILOT_OCR_MIN_CHARS_PER_PAGE` | `180` | Below this, a page is an OCR candidate |
+| `PAPERPILOT_LAYOUT_ENABLED` | `false` | Analyse page layout with PP-Structure |
+| `PAPERPILOT_LAYOUT_MODEL` | `PP-DocLayout_plus-L` | Pinned layout detector |
+| `PAPERPILOT_LAYOUT_DPI` | `200` | Rasterisation DPI; part of the layout cache key |
+| `PAPERPILOT_LAYOUT_CACHE_DIR` | `data/layout_cache` | Analysed pages, keyed by image + config |
 | `PAPERPILOT_CHUNK_MAX_CHARS` | `1200` | Chunk size |
 | `PAPERPILOT_RETRIEVAL_TOP_K` | `8` | Chunks per query |
 | `PAPERPILOT_MAX_RETRIES` | `1` | Retry budget |
@@ -471,6 +562,7 @@ src/paperpilot/
 ├── orchestration/    Planner, state graph engine, retries, events
 ├── providers/        LLM and embedding adapters (incl. the mock)
 ├── reporting/        Citation formatting, report synthesis
+├── response/         Markdown model answers -> deterministic response-document JSON
 ├── retrieval/        BM25, vectors, the paper index, hybrid retriever
 ├── storage/          Repository interfaces, SQLite, local files
 ├── validation/       Quote matching, numeric checks, schema coercion
@@ -490,8 +582,59 @@ These are real, and worth stating plainly:
 - **Table *values* are indexed as text**, not parsed into a cell grid. Numbers are
   checked against the text, so a value in a badly-extracted table may be
   unverifiable even though it is correct in the PDF.
+### Layout analysis (optional)
+
+PyMuPDF reports the blocks a PDF's content stream declares. On many journal
+templates that is one block per column run, with a section heading, its
+paragraph and a figure caption fused into a single object — so the real headings
+are invisible to any "short line" test, and the only heading-shaped blocks left
+on the page are running heads, chart titles and table column headers. PaperPilot
+recovers the structure from line geometry by default, which handles this; where
+it does not, a layout model can be asked what the page actually contains.
+
+```bash
+pip install -e ".[layout]"
+paperpilot ingest --layout paper.pdf
+```
+
+Each page is rasterised and run through PP-Structure, and the text blocks are
+re-cut along the regions it reports: lines in a title region become a heading
+whatever their typography, lines in a header or footer region are dropped as
+page furniture, and a caption is separated from the paragraph beneath it. Pages
+the model does not analyse fall back to the geometric heuristics, so no text is
+ever lost to a failed page.
+
+It costs a rasterise and a model pass per page, which is why it is off by
+default. **It is deterministic**: one CPU thread, fixed seeds, a pinned model, a
+fixed DPI, coordinates quantised before anything sorts or compares them, a total
+order over regions that never depends on detection order, and an on-disk cache
+keyed by the page image *and* the full engine configuration. The same PDF yields
+a byte-identical report on every run, with the cache cold, warm, or disabled.
+
 - **OCR pages are approximate by construction.** Quotes from them match fuzzily
-  and carry reduced confidence. Tesseract must be installed separately.
+  and carry reduced confidence. Tesseract must be installed separately; or set
+  `PAPERPILOT_OCR_ENGINE=paddleocr_vl` to use PaddleOCR-VL-1.6, served locally:
+
+  ```bash
+  brew install llama.cpp
+  hf download PaddlePaddle/PaddleOCR-VL-1.6-GGUF --local-dir ~/models/paddleocr-vl
+  make ocr-server   # keep running alongside `paperpilot serve`
+  ```
+
+  With `paddleocr_vl`, extraction is routed per page and per region: text pages
+  keep PyMuPDF's text layer; scanned pages are read whole by the model; charts
+  and diagrams on text pages (embedded images, or vector drawings that are not
+  ruled tables) are cropped and read by the model as `figure` chunks linked to
+  their caption. Chart values are indexed only when printed in the figure — the
+  model estimates unlabelled bars and invents numbers for diagrams, and neither
+  may reach the verifier as something the paper states.
+
+  Tables are found from their `Table N:` captions and the rules drawn around
+  them, and re-read with `Table Recognition:` to recover what PyMuPDF loses —
+  merged headers, cell order, superscripts. The model's table replaces the
+  native text only when every numeric cell's digits and ~80% of its words match
+  the text layer; otherwise the native text is kept, so a misread digit is never
+  indexed.
 - **The default hashing embedder is weak.** It is deterministic and offline, which
   is right for tests; use a real embedding provider for real retrieval quality.
 - **Equations are preserved, not understood.** Anything that does not survive

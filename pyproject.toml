@@ -22,11 +22,18 @@ dependencies = [
   "pymupdf>=1.24",          # PDF text/blocks/bbox extraction
   "numpy>=1.26",            # vector similarity and numeric checks
   "httpx>=0.27",            # OpenAI-compatible provider transport
+  "markdown-it-py>=3.0",    # deterministic parsing of Markdown model answers
+  "pyyaml>=6.0",            # per-agent reference guides (agents/specs/*.yaml)
 ]
 
 [project.optional-dependencies]
 ocr = ["pytesseract>=0.3.10", "pillow>=10.0"]
+# Document layout analysis (PP-Structure). Pinned rather than bounded: a new
+# model or release finds different regions, which would change the parse of a
+# paper under the caller without a line of PaperPilot changing.
+layout = ["paddlepaddle==3.3.1", "paddleocr==3.7.0", "pillow>=10.0"]
 embeddings = ["sentence-transformers>=2.7"]
+local-llm = ["transformers>=4.56", "torch>=2.4"]
 faiss = ["faiss-cpu>=1.8"]
 qdrant = ["qdrant-client>=1.9"]
 rerank = ["flashrank>=0.2.5"]
@@ -44,7 +51,7 @@ paperpilot = "paperpilot.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-paperpilot = ["web/*.html", "agents/prompts/*.md"]
+paperpilot = ["web/*.html", "agents/prompts/*.md", "agents/specs/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

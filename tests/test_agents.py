@@ -21,47 +21,45 @@ from paperpilot.providers.llm import LLMProvider, LLMResponse
 from paperpilot.providers.mock_llm import UNGROUNDED_CLAIM
 
 
+class MarkdownProvider(LLMProvider):
+    """Answers every request with fixed Markdown."""
+
+    name = "markdown"
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def generate(self, request):
+        return LLMResponse(text=self.text, model="x", provider=self.name)
+
+
 class FailingProvider(LLMProvider):
     name = "failing"
 
-    def generate_json(self, request):
+    def generate(self, request):
         raise ProviderError("provider is down")
 
 
-class MalformedProvider(LLMProvider):
-    name = "malformed"
+class MalformedProvider(MarkdownProvider):
+    """Ignores the requested layout entirely."""
 
-    def generate_json(self, request):
-        return LLMResponse(content={"unexpected": "shape"}, model="x", provider=self.name)
+    def __init__(self) -> None:
+        super().__init__('{"unexpected": "shape"}')
 
 
-class HallucinatingProvider(LLMProvider):
-    """Returns confident findings whose quotes are not in the paper."""
+class HallucinatingProvider(MarkdownProvider):
+    """Returns a confident finding whose quote is not in the paper."""
 
-    name = "hallucinating"
-
-    def generate_json(self, request):
-        return LLMResponse(
-            content={
-                "findings": [
-                    {
-                        "claim": "The model was trained on 400 billion tokens of web text.",
-                        "explanation": "fabricated",
-                        "status": "supported",
-                        "confidence": 0.99,
-                        "impact": 0.9,
-                        "evidence": [
-                            {
-                                "page": 1,
-                                "quote": "We trained on 400 billion tokens of web text.",
-                                "confidence": 0.99,
-                            }
-                        ],
-                    }
-                ]
-            },
-            model="x",
-            provider=self.name,
+    def __init__(self) -> None:
+        super().__init__(
+            "## Findings\n\n"
+            "### Finding 1\n"
+            "- Claim: The model was trained on 400 billion tokens of web text.\n"
+            "- Status: supported\n"
+            "- Confidence: 0.99\n"
+            "- Impact: 0.9\n"
+            "- Explanation: fabricated\n\n"
+            "> [S1] We trained on 400 billion tokens of web text.\n"
         )
 
 
@@ -128,7 +126,7 @@ def test_context_block_exposes_citable_metadata(retriever, index):
 
     results = retriever.search(RetrievalQuery(text="main results", top_k=3))
     block = format_context(results)
-    assert "chunk_id:" in block and "page:" in block and "section:" in block
+    assert "source: S1" in block and "page:" in block and "section:" in block
 
 
 def test_context_block_is_truncated_to_the_budget(retriever):
@@ -204,50 +202,27 @@ def test_math_agent_preserves_equations_verbatim(llm, agent_context):
 
 
 def test_math_agent_marks_unreconstructable_equations_as_unavailable(agent_context):
-    class InventingProvider(LLMProvider):
-        name = "inventing"
-
-        def generate_json(self, request):
-            return LLMResponse(
-                content={
-                    "equations": [
-                        {
-                            "equation_id": "equation-9",
-                            "page": 3,
-                            "source_text": "E = mc^2 + invented_term_not_in_paper",
-                            "representation": "latex",
-                            "purpose": "fabricated",
-                        }
-                    ],
-                    "findings": [],
-                },
-                model="x",
-                provider=self.name,
-            )
-
-    result = MathAgent(InventingProvider(), min_equations=1).run(agent_context)
-    assert result.payload["equations"][0]["representation"] == "unavailable"
+    provider = MarkdownProvider(
+        "## Equations\n\n"
+        "### Equation 9\n"
+        "- Page: 3\n"
+        "- Representation: latex\n"
+        "- Purpose: fabricated\n\n"
+        "```latex\nE = mc^2 + invented_term_not_in_paper\n```\n\n"
+        "## Findings\nNot stated.\n"
+    )
+    result = MathAgent(provider, min_equations=1).run(agent_context)
+    invented = next(e for e in result.payload["equations"] if e["purpose"] == "fabricated")
+    assert invented["representation"] == "unavailable"
     assert result.open_questions
 
 
 def test_math_agent_discards_equations_on_impossible_pages(agent_context):
-    class OutOfRangeProvider(LLMProvider):
-        name = "out_of_range"
-
-        def generate_json(self, request):
-            return LLMResponse(
-                content={
-                    "equations": [
-                        {"equation_id": "eq", "page": 999, "source_text": "x = 1"}
-                    ],
-                    "findings": [],
-                },
-                model="x",
-                provider=self.name,
-            )
-
-    result = MathAgent(OutOfRangeProvider(), min_equations=1).run(agent_context)
-    assert result.payload["equations"] == []
+    provider = MarkdownProvider(
+        "## Equations\n\n### Equation eq\n- Page: 999\n\n```text\nx = 1\n```\n"
+    )
+    result = MathAgent(provider, min_equations=1).run(agent_context)
+    assert all(e["page"] != 999 for e in result.payload["equations"])
     assert any("outside this document" in q for q in result.open_questions)
 
 
@@ -265,27 +240,15 @@ def test_experiment_agent_flags_values_absent_from_their_evidence(agent_context)
     class BadNumberProvider(LLMProvider):
         name = "bad_numbers"
 
-        def generate_json(self, request):
-            chunk = request.evidence[0] if request.evidence else {"page": 1, "text": "x"}
+        def generate(self, request):
+            quote = " ".join(request.evidence[0]["text"][:100].split()).replace("|", "\\|")
             return LLMResponse(
-                content={
-                    "reported_results": [
-                        {
-                            "metric": "F1",
-                            "value": "99.9",
-                            "system": "SRT-Large",
-                            "evidence": [
-                                {
-                                    "page": chunk["page"],
-                                    "quote": chunk["text"][:100],
-                                    "chunk_id": chunk.get("chunk_id"),
-                                    "confidence": 0.9,
-                                }
-                            ],
-                        }
-                    ],
-                    "findings": [],
-                },
+                text=(
+                    "## Reported Results\n\n"
+                    "| System | Metric | Value | Source | Quote |\n"
+                    "| --- | --- | --- | --- | --- |\n"
+                    f"| SRT-Large | F1 | 99.9 | [S1] | {quote} |\n"
+                ),
                 model="x",
                 provider=self.name,
             )
@@ -382,23 +345,13 @@ def test_verifier_records_numeric_checks(llm, agent_context):
 def test_deterministic_checks_override_an_over_confident_verifier(agent_context):
     """A 'supported' verdict with no verifiable quote must be downgraded."""
 
-    class OverConfidentProvider(LLMProvider):
-        name = "over_confident"
-
-        def generate_json(self, request):
-            return LLMResponse(
-                content={
-                    "status": "supported",
-                    "confidence": 0.99,
-                    "explanation": "looks right to me",
-                    "supporting_evidence": [],
-                },
-                model="x",
-                provider=self.name,
-            )
-
+    provider = MarkdownProvider(
+        "## Verdict\n- Status: supported\n- Confidence: 0.99\n\n"
+        "## Explanation\nlooks right to me\n\n"
+        "## Supporting Evidence\nNone.\n"
+    )
     candidate = ClaimCandidate(claim="Some claim about routing", source_agent="summary", impact=0.8)
-    result = VerificationAgent(OverConfidentProvider()).verify(candidate, agent_context)
+    result = VerificationAgent(provider).verify(candidate, agent_context)
     assert result.status is FindingStatus.UNSUPPORTED
     assert any("no verifiable quote" in n for n in result.deterministic_notes)
 

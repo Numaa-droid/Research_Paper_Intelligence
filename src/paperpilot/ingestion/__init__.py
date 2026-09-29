@@ -2,7 +2,22 @@
 
 from .chunker import chunk_document, element_counts
 from .elements import classify_block, looks_like_equation, looks_like_heading, looks_like_table
-from .ocr import NullOCREngine, OCREngine, OCRResult, TesseractOCREngine, build_ocr_engine
+from .layout import (
+    LayoutEngine,
+    LayoutRegion,
+    NullLayoutEngine,
+    PageLayout,
+    PPStructureLayoutEngine,
+    build_layout_engine,
+)
+from .ocr import (
+    NullOCREngine,
+    OCREngine,
+    OCRResult,
+    PaddleOCRVLEngine,
+    TesseractOCREngine,
+    build_ocr_engine,
+)
 from .pdf_parser import (
     ParsedDocument,
     ParsedPage,
@@ -17,13 +32,20 @@ from .service import IngestionResult, IngestionService, new_document_id
 __all__ = [
     "IngestionResult",
     "IngestionService",
+    "LayoutEngine",
+    "LayoutRegion",
+    "NullLayoutEngine",
     "NullOCREngine",
     "OCREngine",
     "OCRResult",
+    "PPStructureLayoutEngine",
+    "PaddleOCRVLEngine",
+    "PageLayout",
     "ParsedDocument",
     "ParsedPage",
     "TesseractOCREngine",
     "TextBlock",
+    "build_layout_engine",
     "build_ocr_engine",
     "chunk_document",
     "classify_block",

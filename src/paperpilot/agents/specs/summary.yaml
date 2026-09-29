@@ -1,0 +1,154 @@
+# Reference guide for the Summary Agent.
+#
+# Rendered into the agent's prompt, above the paper context, with the section for
+# the detected paper kind (empirical | review | theoretical | conceptual). The
+# prompt's TASK template and grounding rules always take precedence; this file
+# explains what a good answer to each heading looks like.
+#
+# Keys under `headings` must be headings of the SUMMARY prompt template
+# (tests/test_specs.py enforces this). A paper kind may override any heading.
+
+agent: summary
+version: 1
+
+role: >-
+  You write the grounded baseline summary of ONE paper for a researcher who has
+  not read it. Everything you write is later checked against the paper's text,
+  and anything the paper attributes to another work is flagged as such.
+
+rules:
+  - >-
+      Summarise what THIS paper does and claims. Background facts about the topic
+      (what a technology is, when it was released) are context, not findings.
+  - >-
+      Every sentence you quote must come from the paper context, verbatim.
+  - >-
+      When a source is tagged "REPORTS CITED WORK [N]", anything you take from it
+      is the cited work's; say "According to [N] …" or "A work the paper reviews
+      ([N]) reports …".
+  - >-
+      Use the paper's own terms. Do not upgrade wording ("fast-changing",
+      "state-of-the-art", "significant") unless the paper uses it.
+  - >-
+      Numbers are copied exactly, with their units, and tied to what they measure.
+  - >-
+      Prefer fewer, sharper findings over many overlapping ones. Two findings that
+      say the same thing in different words are one finding.
+
+avoid:
+  - >-
+      Listing background facts as contributions ("X is a language model").
+  - >-
+      Presenting a cited study's result as the paper's own result.
+  - >-
+      Limitations of the SUBJECT (e.g. "the model can hallucinate") filed as
+      limitations of THE PAPER's study, unless the paper's own work is what is
+      limited.
+  - >-
+      Restating the same finding under several categories.
+
+headings:
+  Research Problem: >-
+    The question the paper sets out to answer, in the paper's framing. One or
+    two sentences.
+  Motivation: >-
+    Why the authors say the problem matters, as they argue it. Do not add your
+    own reasons.
+  Main Contribution: >-
+    What the paper itself adds: a method, a dataset, a measurement, a synthesis,
+    an argument. Name each contribution concretely.
+  Dataset: >-
+    The data the paper itself uses. Write "Not stated." if the paper uses none.
+  Proposed Method: >-
+    The paper's own approach in two or three sentences.
+  Main Results: >-
+    The paper's own headline results, with its numbers.
+  Limitations: >-
+    Limitations of the paper's own work, as the authors state or concede them:
+    trade-offs, untested settings, threats to validity, future work.
+  Assumptions: >-
+    What the paper's approach takes for granted, where the text shows it.
+  Concise Summary: >-
+    3-5 sentences a reader could quote: what was done, how, what was found.
+  Unresolved Questions: >-
+    What the paper leaves open, as questions.
+
+findings: >-
+  5-10 findings. Categories: problem, contribution, dataset, method, results,
+  limitations. A "contribution" finding must describe something the paper
+  itself does. A "results" finding must be the paper's own result, or be
+  explicitly worded as a cited work's.
+
+paper_kinds:
+  empirical:
+    focus: >-
+      The paper runs its own experiments or analyses. The method, data and
+      results are the paper's own; related-work passages are not.
+  review:
+    focus: >-
+      The paper is a literature review or survey. Its OWN work is the review
+      itself: where it searched, what it found about the literature (counts,
+      trends, categories), how it organised the reviewed works and what it
+      concludes across them. What each reviewed work did or found belongs to
+      that work.
+    headings:
+      Main Contribution: >-
+        The review's own contributions: the scope it covers, the corpus it
+        assembled (sources, period, counts), the way it organises the field
+        (domains, themes, taxonomy) and the directions it proposes. Not the
+        findings of individual reviewed works.
+      Dataset: >-
+        The corpus the review searched: databases or venues, search terms,
+        period, and how many records were found or kept, exactly as stated.
+      Proposed Method: >-
+        How the review was carried out: search, selection, grouping and
+        synthesis, in the paper's words. Write "Not stated." for any step the
+        paper does not describe.
+      Main Results: >-
+        What the review itself found about the literature: publication counts,
+        document types, trends, the themes it identifies and its cross-cutting
+        conclusions. A reviewed work's result may appear only attributed to it
+        ("[N] reports …").
+      Limitations: >-
+        Limitations of the REVIEW: its coverage (sources, period, language),
+        its selection and screening, and anything the authors concede. Risks
+        and shortcomings of the reviewed technology are the subject's, not the
+        review's; mention them only as what the reviewed works report.
+      Assumptions: >-
+        What the review takes for granted, for example that the searched
+        sources are representative of the field.
+    rules:
+      - >-
+          Do not describe a reviewed study's procedure as the paper's method.
+      - >-
+          A finding about one reviewed work names that work ([N]).
+  theoretical:
+    focus: >-
+      The paper's contribution is formal: definitions, theorems, proofs,
+      derivations. Results are the statements proved, under their assumptions.
+    headings:
+      Dataset: >-
+        Usually "Not stated." A theoretical paper may have no data.
+      Main Results: >-
+        The main theorems or formal results, stated with their conditions.
+      Assumptions: >-
+        The formal assumptions the results depend on, as the paper states them.
+  conceptual:
+    focus: >-
+      A position, perspective, editorial or framework paper. Its contribution
+      is an argument or a proposal, not a measurement.
+    headings:
+      Dataset: >-
+        Usually "Not stated."
+      Main Results: >-
+        The paper's main arguments and proposals. There may be no numbers.
+
+self_check:
+  - >-
+      Is every contribution something THIS paper does?
+  - >-
+      Is every statement taken from a "REPORTS CITED WORK" source attributed to that work?
+  - >-
+      Does any finding repeat another in different words?
+  - >-
+      Does any wording go beyond what the quote says?

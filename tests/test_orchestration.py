@@ -68,7 +68,7 @@ def test_planner_falls_back_to_the_heuristic_when_the_model_fails(index, setting
     class Broken(LLMProvider):
         name = "broken"
 
-        def generate_json(self, request):
+        def generate(self, request):
             raise ProviderError("down")
 
     plan = create_plan(index, settings, Broken())

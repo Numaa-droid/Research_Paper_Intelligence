@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..domain.enums import ElementType
 from ..domain.models import Finding, MethodologyResult, MethodologyStep
-from ..retrieval.retriever import RetrievalQuery, RetrievalResult
-from ..validation.schema import as_str_list, parse_findings
-from .base import AgentContext, BaseAgent, evidence_from_payload, require_dict
+from ..response.reader import DocumentReader, clean_text, parse_bool
+from ..retrieval.retriever import RetrievalQuery
+from ..validation.evidence import validate_evidence
+from .base import AgentContext, BaseAgent
+from .grounding import Grounder, parse_findings
 from .prompts.registry import METHODOLOGY
+
+#: "Step 2: Encoder", "2. Encoder", "Step 2 — Encoder", "Encoder".
+_STEP_HEADING = re.compile(r"^\s*(?:step\s*)?(\d+)?\s*[:.)\-–—]?\s*(.*)$", re.IGNORECASE)
 
 _METHOD_SECTIONS = ["method", "approach", "model", "architecture", "framework", "algorithm"]
 
@@ -18,6 +24,7 @@ class MethodologyAgent(BaseAgent):
     name = "methodology"
     prompt = METHODOLOGY
     context_limit = 14
+    anchor_section_hints = ("method", "approach", "architecture", "framework", "algorithm", "pipeline", "model")
 
     def queries(self, context: AgentContext) -> list[RetrievalQuery]:
         priority = [s for s in context.priority_sections if s] or _METHOD_SECTIONS
@@ -41,47 +48,70 @@ class MethodologyAgent(BaseAgent):
         ]
 
     def build_result(
-        self, payload: dict[str, Any], context: AgentContext, results: list[RetrievalResult]
+        self, reader: DocumentReader, context: AgentContext, grounder: Grounder
     ) -> tuple[list[Finding], dict[str, Any], list[str]]:
-        data = require_dict(payload, self.name)
-        findings = parse_findings(data.get("findings"), agent=self.name)
-
-        steps: list[MethodologyStep] = []
-        for order, item in enumerate(data.get("pipeline_steps") or [], start=1):
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name") or "").strip()
-            description = str(item.get("description") or "").strip()
-            if not (name or description):
-                continue
-            steps.append(
-                MethodologyStep(
-                    order=int(item.get("order") or order),
-                    name=name or f"Step {order}",
-                    description=description,
-                    evidence=evidence_from_payload(item.get("evidence"), agent=self.name),
-                    is_inferred=bool(item.get("is_inferred")),
-                )
-            )
+        findings = parse_findings(reader, grounder, category="methodology")
+        steps = self._steps(reader, grounder)
 
         # Step evidence is part of the report, so it must be validated too.
-        from ..validation.evidence import validate_evidence
-
         for step in steps:
             for evidence in step.evidence:
                 validate_evidence(evidence, context.index)
 
-        pseudocode = data.get("pseudocode")
+        pseudocode_section = reader.section("pseudocode", "algorithm")
+        code = reader.code(pseudocode_section)
+        pseudocode = code.text.strip() if code is not None else reader.text(pseudocode_section)
+
         result = MethodologyResult(
-            inputs=str(data.get("inputs") or ""),
-            outputs=str(data.get("outputs") or ""),
-            architecture=str(data.get("architecture") or ""),
-            training_procedure=str(data.get("training_procedure") or ""),
-            inference_procedure=str(data.get("inference_procedure") or ""),
-            design_decisions=as_str_list(data.get("design_decisions")),
-            comparison_with_prior_work=str(data.get("comparison_with_prior_work") or ""),
-            pipeline_steps=sorted(steps, key=lambda s: s.order),
-            pseudocode=str(pseudocode).strip() if pseudocode else None,
+            inputs=reader.text(reader.section("inputs", "input")),
+            outputs=reader.text(reader.section("outputs", "output")),
+            architecture=reader.text(reader.section("architecture", "model architecture")),
+            training_procedure=reader.text(reader.section("training procedure", "training")),
+            inference_procedure=reader.text(reader.section("inference procedure", "inference")),
+            design_decisions=reader.items(reader.section("design decisions")),
+            comparison_with_prior_work=reader.text(
+                reader.section("comparison with prior work", "prior work", "related work")
+            ),
+            pipeline_steps=steps,
+            pseudocode=pseudocode or None,
             findings=findings,
         )
         return findings, result.model_dump(mode="json", exclude={"findings"}), []
+
+    @staticmethod
+    def _steps(reader: DocumentReader, grounder: Grounder) -> list[MethodologyStep]:
+        section = reader.section("pipeline steps", "pipeline", "steps")
+        steps: list[MethodologyStep] = []
+        for order, sub in enumerate(reader.subsections(section), start=1):
+            match = _STEP_HEADING.match(sub.heading)
+            number = int(match.group(1)) if match and match.group(1) else order
+            name = clean_text(match.group(2) if match else sub.heading) or f"Step {order}"
+            fields = reader.fields(sub)
+            # Models write the description as prose, as "- Description: …", or as a
+            # plain bullet under "- Inferred: no"; any of them is the description.
+            description = (
+                reader.paragraphs(sub)
+                or reader.field_text(fields, "description", "what it does")
+                or "\n".join(
+                    clean_text(item.text) for item in reader.list_items(sub) if not item.key
+                ).strip()
+            )
+            steps.append(
+                MethodologyStep(
+                    order=max(1, number),
+                    name=name,
+                    description=description,
+                    evidence=grounder.evidence_list(reader.quotes(sub)),
+                    is_inferred=bool(parse_bool(reader.field_text(fields, "inferred", "is inferred"))),
+                )
+            )
+        if steps:
+            return sorted(steps, key=lambda s: s.order)
+
+        # Fallback: a numbered list, "1. Name: description".
+        for order, item in enumerate(reader.list_items(section), start=1):
+            name = clean_text(item.key) if item.key else f"Step {order}"
+            description = clean_text(item.value if item.key else item.text)
+            if description:
+                steps.append(MethodologyStep(order=order, name=name, description=description))
+        return steps

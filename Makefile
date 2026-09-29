@@ -1,5 +1,5 @@
 # PaperPilot developer tasks.
-.PHONY: help install fixture benchmark demo test lint fix cov eval serve docker clean
+.PHONY: help install fixture benchmark demo test lint fix cov eval serve ocr-server docker clean
 
 PY ?= .venv/bin/python
 FIXTURE := fixtures/generated/synthetic_paper.pdf
@@ -39,6 +39,13 @@ eval: benchmark  ## Run the evaluation harness on the benchmark set
 
 serve:  ## Run the API and web UI
 	$(PY) -m paperpilot serve
+
+OCR_MODEL_DIR ?= $(HOME)/models/paddleocr-vl
+
+ocr-server:  ## Run PaddleOCR-VL in llama-server for scanned pages (brew install llama.cpp)
+	llama-server -m $(OCR_MODEL_DIR)/PaddleOCR-VL-1.6-GGUF.gguf \
+		--mmproj $(OCR_MODEL_DIR)/PaddleOCR-VL-1.6-GGUF-mmproj.gguf \
+		--port 8080 --host 127.0.0.1 --temp 0
 
 docker:  ## Build and run the container
 	docker compose up --build

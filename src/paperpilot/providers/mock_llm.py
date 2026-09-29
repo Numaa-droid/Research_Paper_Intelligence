@@ -10,7 +10,9 @@ which means:
   canned fixture;
 * it is honest about its own limits. It deliberately emits one ungrounded claim
   per run so that the Verification Agent has something to catch. A verifier that
-  is never given a bad claim has not been tested.
+  is never given a bad claim has not been tested;
+* it answers in the same Markdown layout the prompts ask real models for, so the
+  deterministic Markdown parser is exercised on every offline run.
 
 It is a test double. It is never a good analysis of a paper, and the CLI and API
 say so in their output when it is the active provider.
@@ -60,27 +62,28 @@ class MockLLMProvider(LLMProvider):
     def model(self) -> str:
         return self._model
 
-    def generate_json(self, request: LLMRequest) -> LLMResponse:
+    def generate(self, request: LLMRequest) -> LLMResponse:
         self.calls.append(request)
-        handler = {
-            "summary": self._summary,
-            "methodology": self._methodology,
-            "experiments": self._experiments,
-            "math": self._math,
-            "verification": self._verification,
-            "planner": self._planner,
-        }.get(request.task, self._fallback)
+        handler, render = {
+            "summary": (self._summary, _render_summary),
+            "methodology": (self._methodology, _render_methodology),
+            "experiments": (self._experiments, _render_experiments),
+            "math": (self._math, _render_math),
+            "coverage": (self._coverage, _render_coverage),
+            "verification": (self._verification, _render_verification),
+            "planner": (self._planner, _render_planner),
+        }.get(request.task, (self._fallback, _render_fallback))
 
-        content = handler(request)
-        prompt_tokens = max(1, len(request.user) // 4)
-        completion_tokens = max(1, len(str(content)) // 4)
+        text = render(handler(request))
         return LLMResponse(
-            content=content,
+            text=text,
             model=self._model,
             provider=self.name,
-            usage=TokenUsage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
+            usage=TokenUsage(
+                prompt_tokens=max(1, len(request.user) // 4),
+                completion_tokens=max(1, len(text) // 4),
+            ),
             latency_ms=0.0,
-            raw=str(content),
         )
 
     # --- grounding helpers ------------------------------------------------
@@ -117,17 +120,7 @@ class MockLLMProvider(LLMProvider):
     def _evidence_object(self, chunk: dict | None, quote: str | None) -> list[dict]:
         if not chunk or not quote:
             return []
-        return [
-            {
-                "page": chunk.get("page"),
-                "section": chunk.get("section"),
-                "source_type": chunk.get("element_type", "paragraph"),
-                "element_id": chunk.get("element_id"),
-                "chunk_id": chunk.get("chunk_id"),
-                "quote": quote,
-                "confidence": 0.9,
-            }
-        ]
+        return [{"source_id": chunk.get("source_id"), "quote": quote}]
 
     def _grounded_finding(
         self,
@@ -566,5 +559,255 @@ class MockLLMProvider(LLMProvider):
             },
         }
 
+    def _coverage(self, request: LLMRequest) -> dict[str, Any]:
+        """One grounded finding per source: its first sentence, quoted verbatim."""
+        findings = []
+        for chunk in request.evidence:
+            quote = next(iter(_sentences(chunk.get("text", ""))), "").strip()[:320]
+            if len(quote) < 20:
+                continue
+            findings.append(
+                {
+                    "claim": f"The paper states: {quote}"[:400],
+                    "explanation": f"Read by the coverage sweep from page {chunk.get('page')}.",
+                    "category": "coverage",
+                    "status": "supported",
+                    "confidence": 0.7,
+                    "impact": 0.4,
+                    "evidence": self._evidence_object(chunk, quote),
+                }
+            )
+        return {"findings": findings}
+
     def _fallback(self, request: LLMRequest) -> dict[str, Any]:
         return {"findings": [], "note": f"mock provider has no handler for task '{request.task}'"}
+
+
+# --- Markdown rendering ------------------------------------------------------
+# The mock writes exactly the layout the prompts in agents/prompts/registry.py
+# request, the way a compliant model would.
+
+
+def _one_line(text: object) -> str:
+    return " ".join(str(text or "").split())
+
+
+def _prose(text: object) -> str:
+    value = str(text or "").strip()
+    return value.replace("\n\n", "\n") if value else "Not stated."
+
+
+def _cell(text: object) -> str:
+    return _one_line(text).replace("|", "\\|")
+
+
+def _yes_no(value: object) -> str:
+    return "yes" if value else "no"
+
+
+def _quotes(evidence: list[dict]) -> str:
+    lines = []
+    for item in evidence:
+        quote = str(item.get("quote") or "").strip().replace("\n\n", "\n")
+        if quote:
+            label = f"[{item['source_id']}] " if item.get("source_id") else ""
+            lines.append("> " + label + quote.replace("\n", "\n> "))
+    return "\n\n".join(lines)
+
+
+def _bullets(items: list[str]) -> str:
+    return "\n".join(f"- {_one_line(i)}" for i in items if str(i).strip()) or "Not stated."
+
+
+def _findings(findings: list[dict]) -> str:
+    parts = ["## Findings"]
+    for number, finding in enumerate(findings, start=1):
+        block = [
+            f"### Finding {number}",
+            f"- Claim: {_one_line(finding['claim'])}",
+            f"- Status: {finding.get('status', 'unknown')}",
+            f"- Category: {finding.get('category') or 'general'}",
+            f"- Confidence: {finding.get('confidence', 0.5)}",
+            f"- Impact: {finding.get('impact', 0.5)}",
+            f"- Explanation: {_one_line(finding.get('explanation'))}",
+        ]
+        quotes = _quotes(finding.get("evidence") or [])
+        parts.append("\n".join(block) + (f"\n\n{quotes}" if quotes else ""))
+    return "\n\n".join(parts)
+
+
+def _sections(pairs: list[tuple[str, str]]) -> str:
+    return "\n\n".join(f"## {heading}\n{body}" for heading, body in pairs)
+
+
+def _render_summary(data: dict) -> str:
+    return (
+        _sections(
+            [
+                ("Research Problem", _prose(data["research_problem"])),
+                ("Motivation", _prose(data["motivation"])),
+                ("Main Contribution", _prose(data["main_contribution"])),
+                ("Dataset", _prose(data["dataset"])),
+                ("Proposed Method", _prose(data["proposed_method"])),
+                ("Main Results", _prose(data["main_results"])),
+                ("Limitations", _prose(data["limitations"])),
+                ("Assumptions", _prose(data["assumptions"])),
+                ("Concise Summary", _prose(data["concise_summary"])),
+                ("Unresolved Questions", _bullets(data["unresolved_questions"])),
+            ]
+        )
+        + "\n\n"
+        + _findings(data["findings"])
+    )
+
+
+def _render_methodology(data: dict) -> str:
+    steps = ["## Pipeline Steps"]
+    for step in data["pipeline_steps"]:
+        quotes = _quotes(step["evidence"])
+        steps.append(
+            f"### Step {step['order']}: {_one_line(step['name'])}\n"
+            f"- Inferred: {_yes_no(step['is_inferred'])}\n\n"
+            f"{_prose(step['description'])}" + (f"\n\n{quotes}" if quotes else "")
+        )
+    pseudocode = data.get("pseudocode")
+    return "\n\n".join(
+        [
+            _sections(
+                [
+                    ("Inputs", _prose(data["inputs"])),
+                    ("Outputs", _prose(data["outputs"])),
+                    ("Architecture", _prose(data["architecture"])),
+                    ("Training Procedure", _prose(data["training_procedure"])),
+                    ("Inference Procedure", _prose(data["inference_procedure"])),
+                    ("Design Decisions", _bullets(data["design_decisions"])),
+                    ("Comparison With Prior Work", _prose(data["comparison_with_prior_work"])),
+                ]
+            ),
+            "\n\n".join(steps),
+            "## Pseudocode\n" + (f"```text\n{pseudocode}\n```" if pseudocode else "Not stated."),
+            _findings(data["findings"]),
+        ]
+    )
+
+
+def _render_experiments(data: dict) -> str:
+    rows = [
+        "| System | Dataset | Split | Metric | Value | Best | Source | Quote |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for item in data["reported_results"]:
+        evidence = (item.get("evidence") or [{}])[0]
+        rows.append(
+            "| "
+            + " | ".join(
+                [
+                    _cell(item.get("system")),
+                    _cell(item.get("dataset")),
+                    _cell(item.get("split")),
+                    _cell(item["metric"]),
+                    _cell(item["value"]),
+                    _yes_no(item.get("is_best")),
+                    f"[{evidence['source_id']}]" if evidence.get("source_id") else "",
+                    _cell(evidence.get("quote")),
+                ]
+            )
+            + " |"
+        )
+    hyper = ["| Name | Value |", "| --- | --- |"] + [
+        f"| {_cell(k)} | {_cell(v)} |" for k, v in data["hyperparameters"].items()
+    ]
+    return (
+        _sections(
+            [
+                ("Datasets", _bullets(data["datasets"])),
+                ("Splits", _prose(data["splits"])),
+                ("Baselines", _bullets(data["baselines"])),
+                ("Metrics", _bullets(data["metrics"])),
+                ("Reported Results", "\n".join(rows)),
+                ("Ablations", _bullets(data["ablations"])),
+                ("Hyperparameters", "\n".join(hyper)),
+                ("Error Analysis", _prose(data["error_analysis"])),
+                ("Statistical Significance", _prose(data["statistical_significance"])),
+                (
+                    "Conclusions",
+                    f"- Supported: {data['conclusions_supported']}\n\n"
+                    + _prose(data["conclusions_assessment"]),
+                ),
+            ]
+        )
+        + "\n\n"
+        + _findings(data["findings"])
+    )
+
+
+def _render_math(data: dict) -> str:
+    equations = ["## Equations"]
+    for equation in data["equations"]:
+        evidence = equation.get("evidence") or []
+        source = evidence[0].get("source_id") if evidence else None
+        lines = [f"### Equation {equation.get('equation_id') or ''}".rstrip()]
+        if source:
+            lines.append(f"- Source: [{source}]")
+        lines += [
+            f"- Page: {equation['page']}",
+            f"- Representation: {equation['representation']}",
+            f"- Purpose: {_one_line(equation['purpose'])}",
+            f"- Derivation stated by authors: {_one_line(equation['derivation_stated_by_authors']) or 'Not stated.'}",
+            f"- Agent interpretation: {_one_line(equation['agent_interpretation'])}",
+            f"- Interpretation differs: {_yes_no(equation['interpretation_differs'])}",
+            f"- Intuition: {_one_line(equation['intuition']) or 'Not stated.'}",
+            "",
+            f"```text\n{equation['source_text']}\n```",
+        ]
+        quotes = _quotes(evidence)
+        equations.append("\n".join(lines) + (f"\n\n{quotes}" if quotes else ""))
+    notation = ["| Symbol | Meaning |", "| --- | --- |"] + [
+        f"| {_cell(k)} | {_cell(v)} |" for k, v in data["notation"].items()
+    ]
+    return "\n\n".join(
+        [
+            "\n\n".join(equations),
+            _sections(
+                [
+                    ("Loss Functions", _bullets(data["loss_functions"])),
+                    ("Optimization Objective", _prose(data["optimization_objective"])),
+                    ("Notation", "\n".join(notation)),
+                ]
+            ),
+            _findings(data["findings"]),
+        ]
+    )
+
+
+def _render_verification(data: dict) -> str:
+    return _sections(
+        [
+            ("Verdict", f"- Status: {data['status']}\n- Confidence: {data['confidence']}"),
+            ("Explanation", _prose(data["explanation"])),
+            ("Supporting Evidence", _quotes(data["supporting_evidence"]) or "None."),
+            ("Contradicting Evidence", _quotes(data["contradicting_evidence"]) or "None."),
+        ]
+    )
+
+
+def _render_planner(data: dict) -> str:
+    rows = ["| Agent | Run | Reason |", "| --- | --- | --- |"]
+    for agent in ("summary", "methodology", "experiments", "math", "table_analysis"):
+        reason = data["rationale"].get(f"run_{agent}", "")
+        rows.append(f"| {agent} | {_yes_no(data[f'run_{agent}'])} | {_cell(reason)} |")
+    return _sections(
+        [
+            ("Agents", "\n".join(rows)),
+            ("Priority Sections", _bullets(data["priority_sections"])),
+        ]
+    )
+
+
+def _render_coverage(data: dict) -> str:
+    table = "## Settings and Values\n| Name | Value | Source | Quote |\n| --- | --- | --- | --- |"
+    return table + "\n\n" + _findings(data.get("findings") or [])
+
+
+def _render_fallback(data: dict) -> str:
+    return f"## Note\n{data.get('note', '')}\n\n## Findings\nNot stated."

@@ -1,7 +1,11 @@
 """The PaperPilot analysis graph.
 
-    ingest -> index -> plan -> specialists -> aggregate -> extract claims
-      -> verify -> (retry?) -> synthesize
+    ingest -> index -> plan -> specialists -> coverage sweep -> aggregate
+      -> extract claims -> verify -> (retry?) -> synthesize
+
+The coverage sweep reads, in document order, every content chunk that no
+specialist was shown, so what reaches the report does not depend on which
+chunks retrieval happened to rank highly.
 
 Retry is a real cycle in the graph, bounded by the plan's ``max_retries``. Only
 the agents that failed to ground their claims re-run, and they re-run with
@@ -10,11 +14,12 @@ feedback describing exactly which claims were rejected.
 
 from __future__ import annotations
 
+import hashlib
 import time
-import uuid
 from dataclasses import dataclass, field
 
 from ..agents import AGENT_REGISTRY, AgentContext, VerificationAgent
+from ..agents.coverage import CoverageAgent, merge_coverage_results, plan_coverage
 from ..agents.verification import apply_verification, extract_high_impact_claims
 from ..config import Settings
 from ..domain.enums import AnalysisStatus
@@ -34,6 +39,9 @@ from ..providers.llm import LLMProvider
 from ..reporting.synthesizer import ReportSynthesizer
 from ..retrieval.index import PaperIndex
 from ..retrieval.retriever import build_retriever
+from ..validation.consistency import annotate_conflicts
+from ..validation.dedupe import merge_duplicate_findings
+from ..validation.reconcile import reconcile_findings
 from .engine import END, StateGraph
 from .events import EventRecorder
 from .planner import create_plan
@@ -72,8 +80,10 @@ def _merge_verifications(
     return list(merged.values())
 
 
-def _finding_id(agent: str, position: int) -> str:
-    return f"{agent}-{position:02d}-{uuid.uuid4().hex[:6]}"
+def _finding_id(agent: str, position: int, claim: str) -> str:
+    """Stable id: the same finding in a re-run of the same paper keeps its id."""
+    digest = hashlib.sha1(f"{agent}\n{position}\n{claim}".encode()).hexdigest()[:6]
+    return f"{agent}-{position:02d}-{digest}"
 
 
 class AnalysisWorkflow:
@@ -100,6 +110,7 @@ class AnalysisWorkflow:
         else:
             graph.add_node("specialists", self._make_sequential_specialists())
 
+        graph.add_node("coverage", self.node_coverage)
         graph.add_node("aggregate", self.node_aggregate)
         graph.add_node("verify", self.node_verify)
         graph.add_node("retry", self.node_retry)
@@ -108,7 +119,8 @@ class AnalysisWorkflow:
         graph.set_entry("ingest")
         graph.add_conditional_edge("ingest", self._after_ingest)
         graph.add_edge("plan", "specialists")
-        graph.add_edge("specialists", "aggregate")
+        graph.add_edge("specialists", "coverage")
+        graph.add_edge("coverage", "aggregate")
         graph.add_edge("aggregate", "verify")
         graph.add_conditional_edge("verify", self._after_verify)
         graph.add_edge("retry", "aggregate")
@@ -192,6 +204,7 @@ class AnalysisWorkflow:
             priority_sections=plan.priority_sections,
             rationale=plan.rationale,
             created_by=plan.created_by,
+            paper_kind=plan.paper_kind,
         )
         return ResearchState(
             analysis_plan=plan, status=AnalysisStatus.ANALYZING, events=recorder.drain()
@@ -208,6 +221,8 @@ class AnalysisWorkflow:
             priority_sections=plan.priority_sections if plan else [],
             attempt=attempt,
             retry_feedback=feedback,
+            paper_kind=plan.paper_kind if plan else "empirical",
+            paper_kind_signals=list(plan.paper_kind_signals) if plan else [],
         )
 
     def _instantiate(self, name: str):
@@ -249,7 +264,7 @@ class AnalysisWorkflow:
         else:
             recorder.completed(
                 f"agent:{name}",
-                f"{len(result.findings)} findings, "
+                f"{len(result.findings)} finding{'' if len(result.findings) == 1 else 's'}, "
                 f"{sum(1 for f in result.findings if f.has_evidence)} with verified evidence",
                 agent=name,
                 findings=len(result.findings),
@@ -279,21 +294,76 @@ class AnalysisWorkflow:
 
         return node
 
+    def node_coverage(self, state: ResearchState) -> ResearchState:
+        """Read every content chunk that no specialist was shown."""
+        recorder = self.res.recorder
+        settings = self.res.settings
+        assert self.res.index is not None
+        if not settings.coverage_enabled:
+            recorder.skipped("coverage", "the coverage sweep is disabled")
+            return ResearchState(events=recorder.drain())
+
+        agent_results = state.get("agent_results", {})
+        plan = plan_coverage(
+            self.res.index, agent_results, max_batches=settings.coverage_max_batches
+        )
+        pending = sum(len(batch) for batch in plan.batches) + len(plan.unread)
+        recorder.started(
+            "coverage",
+            f"{pending} of {len(plan.content)} content chunks were not read by any specialist; "
+            f"reading them in {len(plan.batches)} batch(es)",
+            content=len(plan.content),
+            unread=pending,
+            batches=len(plan.batches),
+        )
+
+        results: list[AgentResult] = []
+        usage: list[AgentUsage] = []
+        for batch in plan.batches:
+            agent = CoverageAgent(self.res.llm, chunks=batch)
+            result = agent.run(self._agent_context(state, attempt=1, feedback=None))
+            results.append(result)
+            if result.usage:
+                usage.append(result.usage)
+        merged = merge_coverage_results(results, plan, self.res.index)
+
+        message = (
+            f"{len(merged.findings)} findings from {merged.payload['read_by_sweep']} "
+            "previously unread chunks"
+        )
+        if merged.payload["unread_sections"]:
+            message += "; still unread: " + ", ".join(merged.payload["unread_sections"])
+        if merged.status == "failed":
+            recorder.failed("coverage", merged.error or "every sweep batch failed")
+        else:
+            recorder.completed("coverage", message, findings=len(merged.findings))
+        return ResearchState(
+            agent_results={"coverage": merged}, usage=usage, events=recorder.drain()
+        )
+
     def node_aggregate(self, state: ResearchState) -> ResearchState:
         recorder = self.res.recorder
         recorder.started("aggregation", "Collecting findings from every agent")
 
         findings: list[Finding] = []
-        for name, result in state.get("agent_results", {}).items():
-            for position, finding in enumerate(result.findings, start=1):
+        results = state.get("agent_results", {})
+        # Registry order, not completion order: parallel agents finish in any
+        # order, and the report must not depend on which answered first.
+        ordered = [*[n for n in AGENT_REGISTRY if n in results], *sorted(set(results) - set(AGENT_REGISTRY))]
+        for name in ordered:
+            for position, finding in enumerate(results[name].findings, start=1):
                 if not finding.finding_id:
-                    finding.finding_id = _finding_id(name, position)
+                    finding.finding_id = _finding_id(name, position, finding.claim)
                 findings.append(finding)
 
         if state.get("retry_count", 0) and state.get("retry_targets"):
             findings = merge_retry_findings(
                 state.get("findings", []), findings, state["retry_targets"]
             )
+        before = len(findings)
+        findings = merge_duplicate_findings(findings)
+        if len(findings) < before:
+            info("aggregation.duplicates_merged", merged=before - len(findings))
 
         grounded = sum(1 for f in findings if f.has_evidence)
         recorder.completed(
@@ -328,6 +398,13 @@ class AnalysisWorkflow:
         )
         results = verifier.verify_all(candidates, context)
         apply_verification(findings, results)
+        experiments = state.get("agent_results", {}).get("experiments")
+        if experiments is not None and experiments.status == "ok":
+            annotate_conflicts(findings, experiments.payload.get("value_conflicts") or [])
+        # Deterministic checks have the last word: whose finding it is, and
+        # whether its wording is the paper's.
+        assert self.res.index is not None
+        reconcile_findings(findings, self.res.index)
 
         counts: dict[str, int] = {}
         for result in results:
@@ -341,7 +418,13 @@ class AnalysisWorkflow:
         )
 
         decision = decide_retry(
-            agent_results=state.get("agent_results", {}),
+            # The coverage sweep reads what the specialists left unread; re-running
+            # it would read the same chunks, so only specialists are retried.
+            agent_results={
+                name: result
+                for name, result in state.get("agent_results", {}).items()
+                if name in AGENT_REGISTRY
+            },
             findings=findings,
             verification_results=results,
             retry_count=int(state.get("retry_count", 0)),
@@ -400,13 +483,20 @@ class AnalysisWorkflow:
             results[name] = result
             if result.usage:
                 usage.append(result.usage)
-            recorder.completed(
-                f"agent:{name}",
-                f"Retry produced {len(result.findings)} findings",
-                agent=name,
-                attempt=retry_count + 1,
-                findings=len(result.findings),
-            )
+            if result.status == "failed":
+                recorder.failed(
+                    f"agent:{name}", result.error or "", agent=name, attempt=retry_count + 1
+                )
+            elif result.status == "skipped":
+                recorder.skipped(f"agent:{name}", result.skip_reason or "", agent=name)
+            else:
+                recorder.completed(
+                    f"agent:{name}",
+                    f"Retry produced {len(result.findings)} findings",
+                    agent=name,
+                    attempt=retry_count + 1,
+                    findings=len(result.findings),
+                )
 
         history = [*state.get("retry_targets_history", []), *targets]  # type: ignore[arg-type]
         update = ResearchState(
@@ -421,6 +511,20 @@ class AnalysisWorkflow:
 
     def node_synthesize(self, state: ResearchState) -> ResearchState:
         recorder = self.res.recorder
+        agent_results = state.get("agent_results", {})
+        ran = {name: r for name, r in agent_results.items() if r.status != "skipped"}
+        failed = {name: r.error or "unknown error" for name, r in ran.items() if r.status == "failed"}
+        errors = [f"{name} agent failed: {error}" for name, error in failed.items()]
+
+        if ran and len(failed) == len(ran):
+            # A report built from zero agent output would look like a real analysis.
+            first_error = next(iter(failed.values()))
+            message = f"Every specialist agent failed, so no report was written. {first_error}"
+            recorder.failed("report", message, agents=list(failed))
+            return ResearchState(
+                status=AnalysisStatus.FAILED, errors=[message], events=recorder.drain()
+            )
+
         recorder.started("report", "Writing the report")
         assert self.res.index is not None
 
@@ -437,7 +541,10 @@ class AnalysisWorkflow:
         )
         recorder.completed("report", f"Report written ({len(report)} characters)")
         return ResearchState(
-            final_report=report, status=AnalysisStatus.COMPLETED, events=recorder.drain()
+            final_report=report,
+            status=AnalysisStatus.COMPLETED,
+            errors=errors,
+            events=recorder.drain(),
         )
 
     # --- entry point ------------------------------------------------------

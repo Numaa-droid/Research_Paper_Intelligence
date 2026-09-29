@@ -253,3 +253,29 @@ def test_a_failing_task_does_not_escape(caplog):
         runner.submit("job", boom)
     finally:
         runner.shutdown()
+
+
+def test_model_responses_are_exposed_as_markdown_and_parsed_documents(client, pdf_bytes):
+    from paperpilot.response import ResponseDocument
+
+    document_id = _upload(client, pdf_bytes).json()["document_id"]
+    analysis_id = client.post(f"/papers/{document_id}/analyze").json()["analysis_id"]
+    body = client.get(f"/analyses/{analysis_id}/responses").json()
+
+    summary = body["agents"]["summary"]
+    assert summary["response_markdown"].startswith("## ")
+    assert ResponseDocument.model_validate(summary["response_document"]).sections
+    assert body["verification"] and body["verification"][0]["response_document"]
+
+
+def test_findings_endpoint_omits_raw_model_responses(client, pdf_bytes):
+    document_id = _upload(client, pdf_bytes).json()["document_id"]
+    analysis_id = client.post(f"/papers/{document_id}/analyze").json()["analysis_id"]
+    verdict = client.get(f"/analyses/{analysis_id}/findings").json()["verification_results"][0]
+    assert "response_markdown" not in verdict
+
+
+def test_response_document_schema_is_published(client):
+    schema = client.get("/schemas/response-document").json()
+    assert schema["$schema"].startswith("https://json-schema.org/")
+    assert {"TableCell", "Section"} <= set(schema["$defs"])

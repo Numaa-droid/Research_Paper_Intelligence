@@ -20,6 +20,11 @@ from .enums import (
     FindingStatus,
 )
 
+#: Whose statement a quote is; see :mod:`paperpilot.discourse.attribution`.
+Attribution = Literal["own", "cited", "mixed", "unknown"]
+#: What kind of paper is being analysed; see :mod:`paperpilot.discourse.profile`.
+PaperKind = Literal["empirical", "review", "theoretical", "conceptual"]
+
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
@@ -155,6 +160,12 @@ class Evidence(StrictModel):
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     citation_quality: CitationQuality = CitationQuality.UNVERIFIABLE
     validation_notes: list[str] = Field(default_factory=list)
+    #: Whose statement the quoted sentences are: the paper's ``own``, a ``cited``
+    #: work's (the paper reporting another work), ``mixed`` or ``unknown``. Set
+    #: deterministically by :mod:`paperpilot.discourse`; ``None`` until then.
+    attribution: Attribution | None = None
+    #: The cited works a ``cited``/``mixed`` quote reports, e.g. ``["[20]"]``.
+    cited_sources: list[str] = Field(default_factory=list)
 
     @field_validator("quote")
     @classmethod
@@ -186,6 +197,10 @@ class Finding(StrictModel):
     finding_id: str | None = None
     impact: float = Field(default=0.5, ge=0.0, le=1.0)
     verification_note: str | None = None
+    #: Attribution of the finding's verified evidence taken together; see
+    #: :attr:`Evidence.attribution`.
+    attribution: Attribution | None = None
+    cited_sources: list[str] = Field(default_factory=list)
 
     @field_validator("claim")
     @classmethod
@@ -232,6 +247,13 @@ class AgentResult(StrictModel):
     skip_reason: str | None = None
     error: str | None = None
     attempt: int = 1
+    #: The model's answer exactly as written (Markdown).
+    response_markdown: str | None = None
+    #: That answer parsed into a ``paperpilot.response.ResponseDocument``.
+    response_document: dict[str, Any] | None = None
+    #: Every chunk shown to the model, in prompt order. The coverage sweep reads
+    #: whatever no agent was shown.
+    context_chunk_ids: list[str] = Field(default_factory=list)
 
     @property
     def ran(self) -> bool:
@@ -306,6 +328,29 @@ class ExperimentResult(StrictModel):
     findings: list[Finding] = Field(default_factory=list)
 
 
+class CoverageDetail(StrictModel):
+    """A setting or value stated in a part of the paper no specialist read."""
+
+    name: str
+    value: str
+    evidence: list[Evidence] = Field(default_factory=list)
+    value_found: bool = False
+
+
+class CoverageResult(StrictModel):
+    """Structured payload of the coverage sweep."""
+
+    details: list[CoverageDetail] = Field(default_factory=list)
+    #: Paper sections the sweep read, in document order.
+    sections_read: list[str] = Field(default_factory=list)
+    content_chunks: int = 0
+    read_by_specialists: int = 0
+    read_by_sweep: int = 0
+    #: Sections with content that no model read, because the sweep budget ran out.
+    unread_sections: list[str] = Field(default_factory=list)
+    findings: list[Finding] = Field(default_factory=list)
+
+
 class EquationExplanation(StrictModel):
     """One equation, preserved in a safe representation.
 
@@ -355,6 +400,8 @@ class VerificationResult(StrictModel):
     numeric_checks: list[NumericCheck] = Field(default_factory=list)
     deterministic_notes: list[str] = Field(default_factory=list)
     attempt: int = 1
+    response_markdown: str | None = None
+    response_document: dict[str, Any] | None = None
 
     @property
     def is_weak(self) -> bool:
@@ -404,6 +451,10 @@ class AnalysisPlan(StrictModel):
     max_retries: int = Field(default=1, ge=0, le=3)
     rationale: dict[str, str] = Field(default_factory=dict)
     created_by: Literal["heuristic", "llm", "hybrid"] = "heuristic"
+    #: What kind of paper this is, decided from its text (see
+    #: :mod:`paperpilot.discourse.profile`), and the signals that decided it.
+    paper_kind: PaperKind = "empirical"
+    paper_kind_signals: list[str] = Field(default_factory=list)
 
     def enabled_agents(self) -> list[str]:
         mapping = {

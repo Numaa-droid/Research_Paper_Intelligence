@@ -11,6 +11,7 @@ can never accidentally clobber another node's contribution.
 
 from __future__ import annotations
 
+import contextvars
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -82,8 +83,12 @@ class StateGraph:
             info("graph.parallel_started", group=name, nodes=members)
             updates: dict[str, ResearchState | None] = {}
             with ThreadPoolExecutor(max_workers=max(1, len(members))) as pool:
+                # copy_context() carries the run's log context (analysis id) into
+                # each worker thread, so every line an agent logs stays attributable.
                 futures = {
-                    pool.submit(self._run_node, member, dict(state)): member  # type: ignore[arg-type]
+                    pool.submit(
+                        contextvars.copy_context().run, self._run_node, member, dict(state)  # type: ignore[arg-type]
+                    ): member
                     for member in members
                 }
                 for future in futures:

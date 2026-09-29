@@ -416,3 +416,41 @@ def test_long_quotes_are_truncated():
         page=1, quote="word " * 200, confidence=0.9, citation_quality=CitationQuality.EXACT
     )
     assert len(format_quote(evidence, max_chars=100)) < 130
+
+
+def test_a_quote_elided_with_an_ellipsis_matches_when_every_part_is_present():
+    from paperpilot.domain.enums import CitationQuality
+    from paperpilot.validation.quotes import match_quote
+
+    source = (
+        "MedCoPilot addresses five key challenges: (1) a multi-strategy ingestion pipeline; "
+        "(2) a structure-aware chunking strategy that preserves clinical relationships."
+    )
+    kept = match_quote("MedCoPilot addresses five key challenges: ... (2) a structure-aware chunking strategy", source)
+    reordered = match_quote("(2) a structure-aware chunking strategy ... MedCoPilot addresses five key", source)
+    altered = match_quote("MedCoPilot addresses five key challenges: ... (2) an invented chunking strategy", source)
+
+    assert kept.quality is CitationQuality.NORMALIZED
+    assert reordered.quality is not CitationQuality.NORMALIZED
+    assert altered.quality is CitationQuality.UNVERIFIABLE
+
+
+def test_an_elided_quote_found_out_of_order_grounds_as_approximate():
+    """Both sentences are the paper's own words, quoted in the reverse order."""
+    from paperpilot.domain.enums import CitationQuality
+    from paperpilot.validation.quotes import match_quote
+
+    source = (
+        "They also support the fact that students could become dependent on artificial "
+        "intelligence, and their development could be stagnated. In terms of opportunities, "
+        "students could use ChatGPT to organize their ideas and create a template."
+    )
+    match = match_quote(
+        "students could use ChatGPT to organize their ideas and create a template"
+        " ... students could become dependent on artificial intelligence",
+        source,
+    )
+    # Grounded rather than discarded, but priced below an in-order quote so the
+    # reordering shows up in the confidence and in the evidence appendix.
+    assert match.quality is CitationQuality.APPROXIMATE
+    assert "not in the order quoted" in match.note

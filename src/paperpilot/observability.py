@@ -1,14 +1,23 @@
 """Structured logging and lightweight tracing.
 
-Events are emitted as single-line JSON so they can be shipped to any log
-aggregator without a tracing dependency. Document text is *not* logged by
-default: events reference document and chunk identifiers instead.
+Every event is structured (a name plus fields). How it is rendered depends on
+where it goes:
+
+* ``json`` — one JSON object per line, for log aggregators;
+* ``pretty`` — one readable sentence per line with a stage label, for a person
+  watching a terminal;
+* ``text`` — ``event key=value`` lines;
+* ``auto`` (default) — ``pretty`` on an interactive terminal, ``json`` otherwise.
+
+Document text is *not* logged by default: events reference document and chunk
+identifiers instead.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import time
 import uuid
@@ -82,18 +91,66 @@ def _safe(value: Any) -> Any:
     return str(value)
 
 
-def configure_logging(level: str = "INFO", fmt: str = "json", stream=None) -> None:
+def resolve_format(fmt: str, stream) -> str:
+    """``auto`` becomes ``pretty`` for a person at a terminal and ``json`` otherwise."""
+    if fmt != "auto":
+        return fmt
+    isatty = getattr(stream, "isatty", None)
+    return "pretty" if callable(isatty) and isatty() else "json"
+
+
+def _wants_color(stream) -> bool:
+    isatty = getattr(stream, "isatty", None)
+    return bool(callable(isatty) and isatty() and not os.environ.get("NO_COLOR"))
+
+
+def configure_logging(
+    level: str = "INFO", fmt: str = "auto", stream=None, *, http: str = "changes"
+) -> None:
     """Install the PaperPilot log handler. Safe to call more than once."""
     global _configured
+    stream = stream or sys.stderr
+    resolved = resolve_format(fmt, stream)
     logger = logging.getLogger(_LOGGER_NAME)
     for handler in list(logger.handlers):
         logger.removeHandler(handler)
-    handler = logging.StreamHandler(stream or sys.stderr)
-    handler.setFormatter(JsonFormatter() if fmt == "json" else TextFormatter())
+    handler = logging.StreamHandler(stream)
+    if resolved == "json":
+        handler.setFormatter(JsonFormatter())
+    elif resolved == "pretty":
+        from .log_render import PrettyFormatter
+
+        handler.setFormatter(PrettyFormatter(color=_wants_color(stream)))
+        handler.addFilter(
+            lambda record: logging.getLevelName(level.upper()) <= logging.DEBUG
+            or not PrettyFormatter.is_redundant(record)
+        )
+    else:
+        handler.setFormatter(TextFormatter())
     logger.addHandler(handler)
     logger.setLevel(level.upper())
     logger.propagate = False
+    configure_http_logging(http, pretty=resolved == "pretty", color=_wants_color(stream))
     _configured = True
+
+
+def configure_http_logging(mode: str, *, pretty: bool = False, color: bool = False) -> None:
+    """Decide which HTTP request lines the server prints.
+
+    ``changes`` (default) keeps requests that change something or went wrong —
+    uploads, analysis starts, any 4xx/5xx — and drops the successful ``GET``
+    polling a browser repeats every second. ``errors`` keeps only 4xx/5xx,
+    ``all`` keeps everything and ``none`` nothing.
+    """
+    from .log_render import HttpAccessFilter, HttpFormatter
+
+    access = logging.getLogger("uvicorn.access")
+    for existing in [f for f in access.filters if isinstance(f, HttpAccessFilter)]:
+        access.removeFilter(existing)
+    access.addFilter(HttpAccessFilter(mode))
+    if pretty:
+        for handler in access.handlers:
+            handler.setFormatter(HttpFormatter(color=color))
 
 
 def get_logger(name: str | None = None) -> logging.Logger:

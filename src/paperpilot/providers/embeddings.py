@@ -12,12 +12,15 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+import threading
 from abc import ABC, abstractmethod
 
 from ..config import Settings
 from ..errors import ProviderError
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+(?:[.\-][a-z0-9]+)*")
+# Process-wide: the accelerator device is shared by every model instance.
+TORCH_INFERENCE_LOCK = threading.Lock()
 
 
 def tokenize(text: str) -> list[str]:
@@ -149,7 +152,11 @@ class SentenceTransformersProvider(EmbeddingProvider):
         self.dim = int(self._model.get_sentence_embedding_dimension())
 
     def embed(self, texts: list[str]) -> list[list[float]]:  # pragma: no cover - optional
-        vectors = self._model.encode(texts, normalize_embeddings=True)
+        # Torch's MPS (and CUDA) backends are not safe for concurrent inference
+        # from multiple threads; parallel specialist agents otherwise abort the
+        # process with a Metal command-buffer assertion.
+        with TORCH_INFERENCE_LOCK:
+            vectors = self._model.encode(texts, normalize_embeddings=True)
         return [list(map(float, v)) for v in vectors]
 
 

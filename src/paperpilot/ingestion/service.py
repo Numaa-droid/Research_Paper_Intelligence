@@ -14,6 +14,7 @@ from ..observability import info, timed
 from ..providers.embeddings import EmbeddingProvider
 from ..retrieval.index import PaperIndex
 from .chunker import chunk_document, element_counts
+from .layout import LayoutEngine, build_layout_engine
 from .ocr import OCREngine, build_ocr_engine
 from .pdf_parser import ParsedDocument, parse_pdf
 
@@ -94,11 +95,13 @@ class IngestionService:
         *,
         embedder: EmbeddingProvider | None = None,
         ocr_engine: OCREngine | None = None,
+        layout_engine: LayoutEngine | None = None,
     ) -> None:
         self.settings = settings
         self.embedder = embedder
-        self.ocr_engine = ocr_engine or build_ocr_engine(
-            enabled=settings.ocr_enabled, language=settings.ocr_language
+        self.ocr_engine = ocr_engine or build_ocr_engine(**settings.ocr_engine_options())
+        self.layout_engine = layout_engine or build_layout_engine(
+            **settings.layout_engine_options
         )
 
     def ingest(self, file_path: str | Path, *, document_id: str | None = None) -> IngestionResult:
@@ -111,6 +114,9 @@ class IngestionService:
                 ocr_engine=self.ocr_engine if self.ocr_engine.available else None,
                 ocr_min_chars=self.settings.ocr_min_chars_per_page,
                 max_bytes=self.settings.max_upload_bytes,
+                figure_ocr=self.settings.ocr_figures_enabled,
+                table_ocr=self.settings.ocr_tables_enabled,
+                layout_engine=self.layout_engine if self.layout_engine.available else None,
             )
             chunks, sections = chunk_document(
                 parsed,
