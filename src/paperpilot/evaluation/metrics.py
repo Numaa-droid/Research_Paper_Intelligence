@@ -219,43 +219,92 @@ def unsupported_claim_rate(record: AnalysisRecord) -> tuple[float | None, dict]:
     }
 
 
-def verification_accuracy(record: AnalysisRecord, index: PaperIndex) -> tuple[float | None, dict]:
-    """How often the verifier's verdict agrees with a deterministic re-check.
+_CLAIMS_SUPPORT = (FindingStatus.SUPPORTED, FindingStatus.PARTIALLY_SUPPORTED)
 
-    The oracle is quote presence in the paper: a claim whose supporting quote is
-    genuinely in the text should not have been called unsupported, and one with
-    no locatable quote should not have been called supported. This needs no
-    human labelling, so it runs on any paper.
+
+def _verification_oracle(
+    claim: str, evidence: list[Evidence], index: PaperIndex, document_numbers: list
+) -> tuple[bool, str]:
+    """Whether the paper deterministically grounds ``claim``, and why.
+
+    Grounded means some quote, from any source, is really in the paper and the
+    quotes found there carry every number the claim states. A number the paper
+    never prints anywhere makes the claim ungrounded outright, whatever is
+    quoted beside it.
+    """
+    numbers = extract_numbers(claim)
+    invented = [n for n in numbers if not any(numbers_equal(n, d) for d in document_numbers)]
+    if invented:
+        return False, "claim states a number the paper does not contain: " + ", ".join(
+            n.raw + n.suffix for n in invented
+        )
+    located = [
+        e for e in evidence
+        if index.has_page(e.page) and match_quote(e.quote, index.page_text(e.page)).found
+    ]
+    if not located:
+        return False, "no quote for the claim is in the paper"
+    quoted = [q for e in located for q in extract_numbers(e.quote, skip_trivial=False)]
+    unquoted = [n for n in numbers if not any(numbers_equal(n, q) for q in quoted)]
+    if unquoted:
+        return False, "quotes found, but none carries " + ", ".join(
+            n.raw + n.suffix for n in unquoted
+        )
+    return True, "a quote is in the paper and carries the claim's numbers"
+
+
+def verification_accuracy(record: AnalysisRecord, index: PaperIndex) -> tuple[float | None, dict]:
+    """Balanced accuracy of the verifier's verdicts against a deterministic oracle.
+
+    The oracle (``_verification_oracle``) labels each verified claim grounded or
+    not from the paper itself, using every quote offered for it: the verifier's
+    and, independently, the originating finding's. A verifier that cites nothing
+    therefore cannot make a well-grounded claim look ungrounded.
+
+    The score is the mean of the verifier's accuracy on grounded claims and on
+    ungrounded ones, so a verifier that always answers the same way scores at
+    most 0.5 when both kinds are present, rather than the share of the majority
+    class. With only one kind present it is plain accuracy on that kind, and
+    ``classes`` in the detail says so.
+
+    Quote presence is evidence, not proof of meaning: a real quote cited for a
+    claim it does not support still counts as grounding. Contradiction is not
+    judged, so ``contradicted`` scores as a non-support verdict.
     """
     results = record.verification_results
     if not results:
         return None, {"claims": 0}
 
-    correct = 0
+    findings = {f.finding_id: f for f in record.findings if f.finding_id}
+    document_numbers = extract_numbers(index.full_text(), skip_trivial=False)
+    tally = {True: [0, 0], False: [0, 0]}  # oracle label -> [agreements, total]
     disagreements: list[dict] = []
     for result in results:
-        locatable = any(
-            index.has_page(e.page) and match_quote(e.quote, index.page_text(e.page)).found
-            for e in result.supporting_evidence
-        )
-        claimed_support = result.status in (
-            FindingStatus.SUPPORTED,
-            FindingStatus.PARTIALLY_SUPPORTED,
-        )
-        if claimed_support == locatable:
-            correct += 1
-        else:
+        finding = findings.get(result.finding_id) if result.finding_id else None
+        evidence = list(result.supporting_evidence) + (finding.evidence if finding else [])
+        grounded, reason = _verification_oracle(result.claim, evidence, index, document_numbers)
+        agrees = (result.status in _CLAIMS_SUPPORT) == grounded
+        tally[grounded][1] += 1
+        tally[grounded][0] += agrees
+        if not agrees:
             disagreements.append(
                 {
                     "claim": result.claim[:140],
                     "verdict": result.status.value,
-                    "quote_locatable": locatable,
+                    "oracle": "grounded" if grounded else "ungrounded",
+                    "reason": reason,
                 }
             )
 
-    return round(correct / len(results), 4), {
+    recalls = [ok / total for ok, total in tally.values() if total]
+    agreements = tally[True][0] + tally[False][0]
+    return round(sum(recalls) / len(recalls), 4), {
         "claims": len(results),
-        "agreements": correct,
+        "agreements": agreements,
+        "raw_accuracy": round(agreements / len(results), 4),
+        "grounded": {"claims": tally[True][1], "agreed": tally[True][0]},
+        "ungrounded": {"claims": tally[False][1], "agreed": tally[False][0]},
+        "classes": sum(1 for _, total in tally.values() if total),
         "disagreements": disagreements[:20],
     }
 

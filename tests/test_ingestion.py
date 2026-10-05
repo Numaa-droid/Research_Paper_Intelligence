@@ -23,6 +23,7 @@ from paperpilot.ingestion.pdf_parser import (
     _authors_from_layout,
     _publication_year,
     _strip_running_heads,
+    extraction_failures,
     needs_ocr,
     normalize_text,
     parse_pdf,
@@ -116,7 +117,7 @@ def test_needs_ocr(text, expected_decision):
 
 
 def test_needs_ocr_respects_threshold():
-    text = "a" * 100
+    text = "word " * 20
     assert needs_ocr(text, min_chars=180) is True
     assert needs_ocr(text, min_chars=50) is False
 
@@ -164,26 +165,112 @@ def test_ocr_result_replaces_thin_native_text(paper_pdf):
     assert all(p.confidence == 0.55 for p in doc.pages)
 
 
-def test_ocr_is_not_used_when_it_recovers_less_than_the_native_layer(paper_pdf):
-    """OCR is a fallback, not an override: worse output must be discarded."""
+def test_the_ocr_reading_of_a_failed_page_is_taken_as_is(paper_pdf):
+    """A page that failed the check has no trustworthy text to compare against."""
 
-    class PoorEngine(NullOCREngine):
+    class ShortEngine(NullOCREngine):
         @property
         def available(self) -> bool:
             return True
 
         def extract_page(self, page, *, page_number: int):
-            return OCRResult(text="blurry", confidence=0.3, engine="poor")
+            return OCRResult(text="Short but correct.", confidence=0.6, engine="paddleocr_vl")
 
-    doc = parse_pdf(paper_pdf, ocr_engine=PoorEngine(), ocr_min_chars=100_000)
+    doc = parse_pdf(paper_pdf, ocr_engine=ShortEngine(), ocr_min_chars=100_000)
+    assert all(p.source is ExtractionMethod.OCR for p in doc.pages)
+    assert all(p.text == "Short but correct." for p in doc.pages)
+
+
+def test_an_empty_ocr_reading_keeps_the_native_text_at_low_confidence(paper_pdf):
+    class EmptyEngine(NullOCREngine):
+        @property
+        def available(self) -> bool:
+            return True
+
+        def extract_page(self, page, *, page_number: int):
+            return OCRResult(text="  \n", confidence=0.6, engine="paddleocr_vl")
+
+    native = parse_pdf(paper_pdf)
+    doc = parse_pdf(paper_pdf, ocr_engine=EmptyEngine(), ocr_min_chars=100_000)
     assert all(p.source is ExtractionMethod.NATIVE_TEXT for p in doc.pages)
-    assert all("blurry" not in p.text for p in doc.pages)
+    assert [p.text for p in doc.pages] == [p.text for p in native.pages]
+    assert all(p.confidence == 0.4 for p in doc.pages)
 
 
 def test_pages_needing_ocr_without_an_engine_lose_confidence(paper_pdf):
     doc = parse_pdf(paper_pdf, ocr_engine=None, ocr_min_chars=100_000)
     assert all(p.confidence < 1.0 for p in doc.pages)
     assert all(p.source is ExtractionMethod.NATIVE_TEXT for p in doc.pages)
+
+
+_PROSE = (
+    "The encoder maps an input sequence of symbol representations to a sequence "
+    "of continuous representations, and the decoder then generates an output "
+    "sequence one element at a time, consuming the previous symbols as input. "
+) * 4
+
+
+def test_clean_prose_passes_the_extraction_check():
+    assert extraction_failures(_PROSE) == []
+
+
+def test_unmapped_glyphs_fail_the_extraction_check():
+    text = " ".join(f"(cid:{i}) token" for i in range(80))
+    assert any(r.startswith("broken glyphs") for r in extraction_failures(text))
+    private_use = _PROSE.replace("e", "\ue001")
+    assert any(r.startswith("broken glyphs") for r in extraction_failures(private_use))
+
+
+def test_words_run_together_fail_the_extraction_check():
+    """A text layer with no space glyphs: each line becomes one long token."""
+    text = "\n".join(line.replace(" ", "") for line in _PROSE.split(", "))
+    assert any(r.startswith("garbled words") for r in extraction_failures(text))
+
+
+def test_mojibake_fails_the_extraction_check():
+    text = " ".join(["qxkzt", "brrwt", "pfftk", "zxcvb", "the"] * 20)
+    assert any(r.startswith("garbled words") for r in extraction_failures(text))
+
+
+def test_acronyms_are_not_mistaken_for_garbled_words():
+    text = (_PROSE + " ") + " ".join(["CNN", "LSTMs", "BLEU", "GPT", "HTTP", "NLP"] * 30)
+    assert extraction_failures(text) == []
+
+
+def test_a_page_covered_by_images_fails_whatever_its_text_layer_holds():
+    reasons = extraction_failures(_PROSE, image_coverage=0.97)
+    assert reasons and reasons[0].startswith("scanned page")
+    assert extraction_failures(_PROSE, image_coverage=0.5) == []
+
+
+def test_a_scanned_page_with_a_hidden_text_layer_is_read_by_ocr(paper_pdf, tmp_path):
+    """Scans often carry an earlier, invisible OCR layer; it is not trusted."""
+    import pymupdf
+
+    with pymupdf.open(paper_pdf) as src:
+        pixmap = src[1].get_pixmap(dpi=72)
+        scan = pymupdf.open()
+        page = scan.new_page(width=src[1].rect.width, height=src[1].rect.height)
+    page.insert_image(page.rect, pixmap=pixmap)
+    page.insert_textbox(page.rect + (40, 40, -40, -40), _PROSE * 2, render_mode=3)
+    path = tmp_path / "scan.pdf"
+    scan.save(path)
+    scan.close()
+
+    calls = []
+
+    class Engine(NullOCREngine):
+        @property
+        def available(self) -> bool:
+            return True
+
+        def extract_page(self, page, *, page_number: int):
+            calls.append(page_number)
+            return OCRResult(text="Read from the image.", confidence=0.6, engine="paddleocr_vl")
+
+    doc = parse_pdf(path, ocr_engine=Engine())
+    assert calls == [1]
+    assert (doc.pages[0].text, doc.pages[0].source) == ("Read from the image.", ExtractionMethod.OCR)
 
 
 # --- normalisation ---------------------------------------------------------
@@ -466,7 +553,7 @@ def test_paddleocr_vl_engine_degrades_when_the_server_is_down(paper_pdf):
     def refuse(request):
         raise httpx.ConnectError("connection refused", request=request)
 
-    engine = build_ocr_engine(enabled=True, engine="paddleocr_vl")
+    engine = build_ocr_engine(enabled=True)
     assert isinstance(engine, PaddleOCRVLEngine)
 
     engine = PaddleOCRVLEngine(transport=httpx.MockTransport(refuse))

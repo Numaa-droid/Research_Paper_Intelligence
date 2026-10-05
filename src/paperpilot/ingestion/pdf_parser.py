@@ -77,6 +77,8 @@ class ParsedPage:
     #: chunker re-cuts the blocks along them; ``None`` means the geometric
     #: heuristics are on their own.
     layout: PageLayout | None = None
+    #: Why the native text layer failed the extraction check (empty: it passed).
+    extraction_failures: list[str] = field(default_factory=list)
 
     def to_model(self) -> PageText:
         return PageText(
@@ -1022,9 +1024,20 @@ def parse_pdf(
                 except Exception:  # noqa: BLE001
                     parsed.printed_label = None
 
-            if needs_ocr(native_text, min_chars=ocr_min_chars) and ocr_engine is not None:
-                ocr_result = ocr_engine.extract_page(page, page_number=page_number)
-                if ocr_result is not None and len(ocr_result.text) > len(native_text):
+            failures = extraction_failures(
+                native_text, min_chars=ocr_min_chars, image_coverage=_image_coverage(page)
+            )
+            parsed.extraction_failures = failures
+            if failures:
+                info("ingestion.page_flagged", page=page_number, reasons=failures)
+                ocr_result = (
+                    ocr_engine.extract_page(page, page_number=page_number)
+                    if ocr_engine is not None
+                    else None
+                )
+                if ocr_result is not None and ocr_result.text.strip():
+                    # The model's reading is taken as-is: the native layer
+                    # already failed the check, so it is not a yardstick.
                     parsed.text = normalize_text(ocr_result.text)
                     parsed.source = ExtractionMethod.OCR
                     parsed.confidence = ocr_result.confidence
@@ -1036,10 +1049,15 @@ def parse_pdf(
                             source=ExtractionMethod.OCR,
                         )
                     ]
-                    info("ingestion.ocr_page", page=page_number, chars=len(parsed.text))
-            elif needs_ocr(native_text, min_chars=ocr_min_chars):
-                # No OCR available: be explicit rather than pretending the page is empty.
-                parsed.confidence = 0.4
+                    info(
+                        "ingestion.ocr_page",
+                        page=page_number,
+                        chars=len(parsed.text),
+                        engine=ocr_result.engine,
+                    )
+                else:
+                    # No reading: be explicit that the kept native text is suspect.
+                    parsed.confidence = 0.4
             else:
                 if ocr_engine is not None and table_ocr and ocr_engine.supports_tables:
                     tables = _add_table_blocks(page, parsed, ocr_engine)
@@ -1078,15 +1096,92 @@ def parse_pdf(
     )
 
 
-def needs_ocr(text: str, *, min_chars: int = 180) -> bool:
-    """Decide whether a page's native text layer is too thin to trust.
+#: A text layer below this share of letters is symbol soup, not prose.
+_MIN_LETTER_RATIO = 0.5
+#: Broken glyph units per word above which the font encoding is unreadable.
+_MAX_BROKEN_GLYPHS_PER_WORD = 0.05
+#: Share of word characters in non-words above which the text layer is garbled.
+#: Weighted by length, because one run-together token can hold a whole line.
+_MAX_GARBLED_WORD_RATIO = 0.3
+#: Less word text than this is too small a sample to judge garbling. Counted in
+#: characters, since a garbled layer may hold only a few (very long) tokens.
+_MIN_WORD_CHARS_TO_JUDGE = 100
+#: A page this covered by raster images is a scan, whatever its text layer holds.
+_SCANNED_IMAGE_COVERAGE = 0.85
 
-    Deliberately non-LLM and cheap: a page is a candidate for OCR when it holds
-    fewer than ``min_chars`` usable characters, or when what it does hold is
-    mostly non-alphabetic (a symptom of a scanned page with stray artefacts).
+#: Glyphs a font could not map to Unicode: PyMuPDF's ``(cid:N)`` placeholders,
+#: the replacement character, private-use code points and stray control codes.
+_BROKEN_GLYPH = re.compile(r"\(cid:\d+\)|[\ufffd\ue000-\uf8ff\x00-\x08\x0b\x0c\x0e-\x1f]")
+_WORD_TOKEN = re.compile(r"[^\W\d_]{4,}")
+_VOWEL = re.compile(r"[aeiouyAEIOUY]")
+#: Words run together when the text layer has no space glyphs.
+_RUN_TOGETHER_LENGTH = 25
+
+
+def _is_garbled_word(word: str) -> bool:
+    if word.isupper() or (word[:-1].isupper() and word[-1] == "s"):
+        return False  # acronyms (CNN, LSTMs) legitimately have no vowels
+    if not word.isascii():
+        return False  # non-Latin scripts are not judged by Latin vowels
+    return len(word) >= _RUN_TOGETHER_LENGTH or not _VOWEL.search(word)
+
+
+def extraction_failures(
+    text: str, *, min_chars: int = 180, image_coverage: float = 0.0
+) -> list[str]:
+    """Why a page's native text layer cannot be trusted; empty when it can.
+
+    Deliberately non-LLM and cheap. Each check targets a different way a PDF
+    text layer goes wrong, and any one failing sends the page to the OCR model:
+
+    - **thin**: fewer than ``min_chars`` usable characters (a scan, or a page
+      that is one big image);
+    - **symbols**: mostly non-letters (scan artefacts, stray glyphs);
+    - **broken glyphs**: characters the font could not map to Unicode;
+    - **garbled words**: tokens that are not words — no vowels, or several
+      words run together because the layer has no space glyphs;
+    - **scanned**: raster images cover nearly the whole page, so whatever text
+      layer exists was laid over a scan by some earlier OCR pass.
     """
     stripped = (text or "").strip()
+    failures: list[str] = []
+    if image_coverage >= _SCANNED_IMAGE_COVERAGE:
+        failures.append(f"scanned page ({image_coverage:.0%} covered by images)")
     if len(stripped) < min_chars:
-        return True
+        failures.append(f"thin text layer ({len(stripped)} < {min_chars} chars)")
+        return failures
     letters = sum(1 for c in stripped if c.isalpha())
-    return (letters / len(stripped)) < 0.5
+    if letters / len(stripped) < _MIN_LETTER_RATIO:
+        failures.append(f"mostly non-letters ({letters / len(stripped):.0%} letters)")
+
+    words = stripped.split()
+    broken = len(_BROKEN_GLYPH.findall(stripped))
+    if broken / max(len(words), 1) > _MAX_BROKEN_GLYPHS_PER_WORD:
+        failures.append(f"broken glyphs ({broken} unmapped characters)")
+
+    candidates = _WORD_TOKEN.findall(stripped)
+    word_chars = sum(len(w) for w in candidates)
+    if word_chars >= _MIN_WORD_CHARS_TO_JUDGE:
+        garbled = sum(len(w) for w in candidates if _is_garbled_word(w))
+        share = garbled / word_chars
+        if share > _MAX_GARBLED_WORD_RATIO:
+            failures.append(f"garbled words ({share:.0%} of word text is not words)")
+    return failures
+
+
+def needs_ocr(text: str, *, min_chars: int = 180, image_coverage: float = 0.0) -> bool:
+    """Whether a page's text layer fails :func:`extraction_failures`."""
+    return bool(extraction_failures(text, min_chars=min_chars, image_coverage=image_coverage))
+
+
+def _image_coverage(page: pymupdf.Page) -> float:
+    """Share of the page area covered by raster images (overlaps counted once each)."""
+    area = abs(page.rect)
+    if not area:
+        return 0.0
+    try:
+        infos = page.get_image_info()
+    except Exception:  # noqa: BLE001 - coverage is a hint, never a failure
+        return 0.0
+    covered = sum(abs(pymupdf.Rect(i["bbox"]) & page.rect) for i in infos if i.get("bbox"))
+    return min(covered / area, 1.0)

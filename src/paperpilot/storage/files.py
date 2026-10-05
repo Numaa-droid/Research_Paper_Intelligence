@@ -7,15 +7,15 @@ never escape the upload directory.
 from __future__ import annotations
 
 import re
-import shutil
 from pathlib import Path
 from typing import BinaryIO
 
-from ..errors import NotFoundError
+from ..errors import FileTooLargeError, NotFoundError
 from ..observability import debug
 from .repository import FileStorage
 
 _SAFE = re.compile(r"[^A-Za-z0-9._-]")
+_COPY_CHUNK = 1024 * 1024
 
 
 def safe_filename(name: str, *, fallback: str = "upload.pdf") -> str:
@@ -33,10 +33,23 @@ class LocalFileStorage(FileStorage):
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.report_dir.mkdir(parents=True, exist_ok=True)
 
-    def save_upload(self, stream: BinaryIO, *, filename: str, document_id: str) -> Path:
+    def save_upload(
+        self, stream: BinaryIO, *, filename: str, document_id: str, max_bytes: int | None = None
+    ) -> Path:
+        """Copy ``stream`` to disk, stopping as soon as it passes ``max_bytes``."""
         target = self.upload_dir / f"{document_id}__{safe_filename(filename)}"
+        written = 0
         with target.open("wb") as handle:
-            shutil.copyfileobj(stream, handle)
+            while chunk := stream.read(_COPY_CHUNK):
+                written += len(chunk)
+                if max_bytes is not None and written > max_bytes:
+                    handle.close()
+                    target.unlink(missing_ok=True)
+                    raise FileTooLargeError(
+                        f"upload exceeds the {max_bytes / (1024 * 1024):g} MB limit",
+                        details={"max_bytes": max_bytes},
+                    )
+                handle.write(chunk)
         debug("storage.upload_saved", document_id=document_id, bytes=target.stat().st_size)
         return target
 

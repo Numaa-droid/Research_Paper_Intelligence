@@ -1,8 +1,8 @@
 # PaperPilot API image.
 #
-# Tesseract is installed because OCR is a fallback the ingestion layer expects to
-# be able to reach; without it, scanned pages are indexed with whatever native
-# text exists and the /health endpoint says so.
+# OCR runs outside the image: pages that fail the extraction check are sent to
+# PaddleOCR-VL in llama-server (`make ocr-server` on the host). Without it,
+# those pages are indexed with whatever native text exists, at low confidence.
 
 FROM python:3.12-slim AS base
 
@@ -10,22 +10,16 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        tesseract-ocr \
-        libtesseract-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Dependency layer: copy only the manifest first so edits to source do not
 # invalidate the (slow) install layer.
 COPY pyproject.toml README.md ./
 COPY src ./src
-# Optional extras to bake in, e.g. "ocr,embeddings" when the runtime config
+# Optional extras to bake in, e.g. "postgres,embeddings" when the runtime config
 # selects PAPERPILOT_EMBEDDING_PROVIDER=sentence_transformers. Torch comes from
 # the CPU wheel index so the image does not pull multi-GB CUDA libraries.
-ARG PAPERPILOT_EXTRAS=ocr
+ARG PAPERPILOT_EXTRAS=postgres
 RUN pip install --no-cache-dir \
         --extra-index-url https://download.pytorch.org/whl/cpu \
         ".[${PAPERPILOT_EXTRAS}]"

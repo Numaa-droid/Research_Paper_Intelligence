@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,11 +11,25 @@ from paperpilot.api.app import create_app
 from paperpilot.api.tasks import InlineTaskRunner, ThreadPoolTaskRunner
 from paperpilot.domain.enums import AnalysisStatus
 
+ACCOUNT = {"name": "Ada", "email": "ada@example.com", "password": "correct horse"}
+
+
+@contextmanager
+def _signed_in(service, account=ACCOUNT, **settings):
+    """A client for ``service`` with ``settings`` applied, signed in as ``account``."""
+    for name, value in settings.items():
+        setattr(service.settings, name, value)
+    app = create_app(service.settings, service=service, task_runner=InlineTaskRunner())
+    with TestClient(app) as test_client:
+        if account:
+            response = test_client.post("/auth/signup", json=account)
+            assert response.status_code == 201, response.text
+        yield test_client
+
 
 @pytest.fixture
 def client(service):
-    app = create_app(service.settings, service=service, task_runner=InlineTaskRunner())
-    with TestClient(app) as test_client:
+    with _signed_in(service) as test_client:
         yield test_client
 
 
@@ -66,9 +82,7 @@ def test_upload_rejects_a_file_that_is_not_really_a_pdf(client):
 
 
 def test_upload_rejects_an_oversized_file(service, pdf_bytes):
-    service.settings.max_upload_mb = 0.0001
-    app = create_app(service.settings, service=service, task_runner=InlineTaskRunner())
-    with TestClient(app) as client:
+    with _signed_in(service, max_upload_mb=0.0001) as client:
         response = _upload(client, pdf_bytes)
     assert response.status_code == 413
 
@@ -279,3 +293,197 @@ def test_response_document_schema_is_published(client):
     schema = client.get("/schemas/response-document").json()
     assert schema["$schema"].startswith("https://json-schema.org/")
     assert {"TableCell", "Section"} <= set(schema["$defs"])
+
+
+# --- access control --------------------------------------------------------
+
+
+def test_without_a_session_every_api_call_is_refused(service, pdf_bytes):
+    with _signed_in(service, account=None) as client:
+        assert _upload(client, pdf_bytes).status_code == 401
+        assert client.get("/papers").status_code == 401
+        response = client.get("/analyses", headers={"Authorization": "Bearer forged"})
+        assert response.status_code == 401
+        assert response.json()["code"] == "unauthorized"
+
+
+def test_the_ui_shell_health_docs_and_sign_in_stay_public(service):
+    with _signed_in(service, account=None) as client:
+        for path in ("/", "/health", "/openapi.json", "/auth/config"):
+            assert client.get(path).status_code == 200, path
+
+
+def test_sign_up_sets_a_session_cookie_and_returns_a_bearer_token(service):
+    with _signed_in(service, account=None) as client:
+        response = client.post("/auth/signup", json=ACCOUNT)
+        assert response.status_code == 201
+        assert "httponly" in response.headers["set-cookie"].lower()
+        token = response.json()["token"]
+        assert client.get("/auth/me").json()["email"] == "ada@example.com"
+        client.cookies.clear()
+        assert client.get("/auth/me").status_code == 401
+        assert client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+
+
+def test_log_in_log_out_and_wrong_passwords(service):
+    with _signed_in(service) as client:
+        assert client.post("/auth/logout").status_code == 204
+        assert client.get("/auth/me").status_code == 401
+        wrong = client.post("/auth/login", json={"email": "ada@example.com", "password": "nope nope"})
+        unknown = client.post("/auth/login", json={"email": "who@example.com", "password": "nope nope"})
+        assert wrong.status_code == unknown.status_code == 401
+        assert wrong.json()["message"] == unknown.json()["message"]
+        ok = client.post("/auth/login", json={"email": "ADA@example.com ", "password": "correct horse"})
+        assert ok.status_code == 200
+        assert client.get("/auth/me").status_code == 200
+
+
+def test_sign_up_validates_and_refuses_a_second_account_for_the_same_email(service):
+    with _signed_in(service) as client:
+        assert client.post("/auth/signup", json=ACCOUNT).status_code == 409
+        short = client.post("/auth/signup", json={**ACCOUNT, "email": "b@example.com", "password": "short"})
+        assert short.status_code == 400
+        bad_email = client.post("/auth/signup", json={**ACCOUNT, "email": "not-an-email"})
+        assert bad_email.status_code == 400
+
+
+def test_an_invite_code_is_required_when_configured(service):
+    with _signed_in(service, account=None, invite_code="let-me-in") as client:
+        assert client.get("/auth/config").json()["invite_required"] is True
+        assert client.post("/auth/signup", json=ACCOUNT).status_code == 403
+        wrong = client.post("/auth/signup", json={**ACCOUNT, "invite_code": "guess"})
+        assert wrong.status_code == 403
+        ok = client.post("/auth/signup", json={**ACCOUNT, "invite_code": "let-me-in"})
+        assert ok.status_code == 201
+        assert not any("invite code" in w for w in client.get("/health").json()["warnings"])
+
+
+def test_health_warns_when_the_ocr_server_is_unreachable(service):
+    # Port 9 (discard) refuses connections, so the availability probe fails fast.
+    with _signed_in(
+        service, ocr_enabled=True, ocr_base_url="http://127.0.0.1:9/v1"
+    ) as client:
+        warnings = " ".join(client.get("/health").json()["warnings"])
+    assert "PaddleOCR-VL server at http://127.0.0.1:9/v1 is not reachable" in warnings
+
+
+def test_health_warns_when_sign_up_is_open(client):
+    assert any("invite code" in w for w in client.get("/health").json()["warnings"])
+
+
+def test_each_account_sees_only_its_own_papers_and_analyses(service, pdf_bytes):
+    with _signed_in(service) as ada:
+        document_id = _upload(ada, pdf_bytes).json()["document_id"]
+        analysis_id = ada.post(f"/papers/{document_id}/analyze", json={"wait": True}).json()["analysis_id"]
+        assert [a["analysis_id"] for a in ada.get("/analyses").json()] == [analysis_id]
+        assert ada.get("/analyses").json()[0]["status"] == "completed"
+
+        ada.cookies.clear()
+        bob = {"name": "Bob", "email": "bob@example.com", "password": "another secret"}
+        assert ada.post("/auth/signup", json=bob).status_code == 201
+        assert ada.get("/papers").json() == []
+        assert ada.get("/analyses").json() == []
+        assert ada.get(f"/papers/{document_id}").status_code == 404
+        assert ada.get(f"/analyses/{analysis_id}").status_code == 404
+        assert ada.get(f"/analyses/{analysis_id}/report").status_code == 404
+        assert ada.post(f"/papers/{document_id}/analyze").status_code == 404
+
+
+def test_the_first_account_inherits_papers_uploaded_before_accounts_existed(service, paper_pdf):
+    import io
+
+    earlier = service.register_upload(io.BytesIO(paper_pdf.read_bytes()), filename="old.pdf")
+    with _signed_in(service) as client:
+        assert [p["document_id"] for p in client.get("/papers").json()] == [earlier.document_id]
+
+
+def test_changing_the_password_signs_out_other_sessions(service):
+    with _signed_in(service, account=None) as client:
+        here = {"Authorization": f"Bearer {client.post('/auth/signup', json=ACCOUNT).json()['token']}"}
+        login = {"email": ACCOUNT["email"], "password": ACCOUNT["password"]}
+        elsewhere = {"Authorization": f"Bearer {client.post('/auth/login', json=login).json()['token']}"}
+        wrong = client.post(
+            "/auth/password", json={"current_password": "x" * 9, "new_password": "y" * 9}, headers=here
+        )
+        assert wrong.status_code == 401
+        changed = client.post(
+            "/auth/password",
+            json={"current_password": ACCOUNT["password"], "new_password": "brand new pass"},
+            headers=here,
+        )
+        assert changed.status_code == 204
+        assert client.get("/auth/me", headers=here).status_code == 200
+        assert client.get("/auth/me", headers=elsewhere).status_code == 401
+        assert client.post("/auth/login", json={**login, "password": "brand new pass"}).status_code == 200
+
+
+def test_sign_in_attempts_are_rate_limited(service):
+    with _signed_in(service, account=None) as client:
+        codes = [
+            client.post("/auth/login", json={"email": "a@b.co", "password": "wrong pass"}).status_code
+            for _ in range(21)
+        ]
+    assert codes[:20] == [401] * 20 and codes[20] == 429
+
+
+def test_uploads_and_analyses_are_rate_limited_per_client(service, pdf_bytes):
+    with _signed_in(service, rate_limit_requests=2, rate_limit_window_seconds=60) as client:
+        document_id = _upload(client, pdf_bytes).json()["document_id"]
+        assert client.post(f"/papers/{document_id}/analyze", json={"wait": True}).status_code == 202
+        limited = _upload(client, pdf_bytes)
+        assert limited.status_code == 429
+        assert 1 <= int(limited.headers["Retry-After"]) <= 60
+        # Reads are not costly and are never limited: the UI polls them.
+        assert client.get(f"/papers/{document_id}").status_code == 200
+
+
+def test_an_oversized_upload_is_refused_from_its_declared_length(service):
+    with _signed_in(service, max_upload_mb=0.01) as client:
+        response = _upload(client, b"%PDF-" + b"0" * 200_000)
+    assert response.status_code == 413
+    assert not list(service.files.upload_dir.iterdir())
+
+
+def test_an_oversized_upload_without_a_length_is_cut_off_while_streaming(service):
+    boundary = "pp-boundary"
+
+    def body():
+        yield (
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"big.pdf\"\r\n"
+            "Content-Type: application/pdf\r\n\r\n%PDF-"
+        ).encode()
+        for _ in range(64):
+            yield b"0" * 16_384
+        yield f"\r\n--{boundary}--\r\n".encode()
+
+    with _signed_in(service, max_upload_mb=0.01) as client:
+        response = client.post(
+            "/papers", content=body(), headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
+        )
+    assert response.status_code == 413
+    assert response.json()["code"] == "file_too_large"
+    assert not list(service.files.upload_dir.iterdir())
+
+
+def test_the_rate_limiter_window_slides():
+    from paperpilot.api.guard import RateLimiter
+
+    now = [0.0]
+    limiter = RateLimiter(2, 10, clock=lambda: now[0])
+    assert limiter.hit("a") is None and limiter.hit("a") is None
+    assert limiter.hit("a") == 10
+    assert limiter.hit("b") is None
+    now[0] = 10.5
+    assert limiter.hit("a") is None
+
+
+def test_storage_stops_writing_an_upload_past_the_cap(tmp_path):
+    import io
+
+    from paperpilot.errors import FileTooLargeError
+    from paperpilot.storage.files import LocalFileStorage
+
+    storage = LocalFileStorage(upload_dir=tmp_path / "u", report_dir=tmp_path / "r")
+    with pytest.raises(FileTooLargeError):
+        storage.save_upload(io.BytesIO(b"x" * 3_000_000), filename="a.pdf", document_id="d", max_bytes=1_000_000)
+    assert not list((tmp_path / "u").iterdir())

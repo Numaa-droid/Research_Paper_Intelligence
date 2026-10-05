@@ -37,8 +37,12 @@ from ..domain.models import (
     VerificationResult,
 )
 from ..retrieval.index import PaperIndex
+from ..validation.absence import PaperCoverage
+from ..validation.cooccurrence import PaperNumbers
+from ..validation.symbols import PLACEHOLDER, SymbolDefinitions
 from ..validation.terms import PaperVocabulary
 from .citations import citation_key, format_citations, format_quote
+from .completeness import StatedSettings, partly_read_tables
 
 _STATUS_LABEL = {
     FindingStatus.SUPPORTED: "Supported",
@@ -157,6 +161,11 @@ class ReportSynthesizer:
         retry_count: int = 0,
     ) -> str:
         self._vocabulary = PaperVocabulary(index)
+        self._numbers = PaperNumbers(index)
+        self._number_flags: list[str] = []
+        self._coverage = PaperCoverage(index)
+        self._symbols = SymbolDefinitions(index)
+        self._absence_fixes: list[str] = []
         self._index = index
         self._amap: AttributionMap = attribution_map(index)
         self._kind = plan.paper_kind if plan else "empirical"
@@ -182,6 +191,7 @@ class ReportSynthesizer:
             self._open_questions(agent_results, findings),
             self._how_this_was_produced(plan, agent_results, verification_results, retry_count, usage),
         ]
+        self._add_unmentioned_settings(sections)
         if self.include_appendix:
             sections.append(self._evidence_appendix(findings, verification_results))
         sections.append(self._footer(metadata, index))
@@ -291,7 +301,7 @@ class ReportSynthesizer:
             ("Inference", "inference_procedure"),
             ("Relation to prior work", "comparison_with_prior_work"),
         ):
-            value = self._prose(payload.get(key))
+            value = self._prose(payload.get(key), subject=label)
             if value:
                 lines.append(f"**{label}.** {value}")
                 lines.append("")
@@ -338,7 +348,7 @@ class ReportSynthesizer:
         if decisions:
             lines.append("### Design decisions")
             lines.append("")
-            lines.extend(f"- {_esc(d)}" for d in decisions)
+            lines.extend(f"- {self._prose(d)}" for d in decisions)
             lines.append("")
 
         if payload.get("pseudocode"):
@@ -405,11 +415,28 @@ class ReportSynthesizer:
                     lines.append(f"| `{_esc(symbol)}` | {_esc(meaning)} |")
             shapes = equation.get("shapes") or {}
             if shapes:
+                rendered, corrected = [], 0
+                for symbol, shape in shapes.items():
+                    found = (
+                        self._symbols.lookup(symbol, variables.get(symbol))
+                        if PLACEHOLDER.match(shape or "")
+                        else None
+                    )
+                    if found is None:
+                        rendered.append(f"`{_esc(symbol)}`: {_esc(shape)}")
+                        continue
+                    corrected += 1
+                    self._absence_fixes.append(f"shape of {symbol}: {found.describe()}")
+                    rendered.append(f"`{_esc(symbol)}`: {_esc(found.describe())} ‡")
                 lines.append("")
-                lines.append(
-                    "**Shapes.** "
-                    + ", ".join(f"`{_esc(k)}`: {_esc(v)}" for k, v in shapes.items())
-                )
+                lines.append("**Shapes.** " + ", ".join(rendered))
+                if corrected:
+                    lines.append("")
+                    lines.append(
+                        "_‡ The agent marked these “not defined in the paper”; the paper does "
+                        "define them, and the definition shown is the paper's own, read from "
+                        "its text without a model._"
+                    )
             if equation.get("derivation_stated_by_authors"):
                 lines.append("")
                 lines.append(
@@ -449,7 +476,7 @@ class ReportSynthesizer:
             ("Metrics", _stated(payload.get("metrics") or [])),
         ):
             own, cited = self._split_by_attribution(items)
-            text = _esc(", ".join(own)) or "_not established_"
+            text = self._prose(", ".join(own), subject=label) or "_not established_"
             lines.append(f"**{label}.** {text}")
             if cited:
                 lines.append("")
@@ -469,7 +496,7 @@ class ReportSynthesizer:
             lines.append("| Name | Value |")
             lines.append("| --- | --- |")
             for name, value in hyperparameters.items():
-                lines.append(f"| {_esc(name)} | {_esc(value)} |")
+                lines.append(f"| {_esc(name)} | {self._prose(value, audit=f'{name}: {value}')} |")
         return "\n".join(lines)
 
     def _results(self, agent_results: dict[str, AgentResult], findings: list[Finding]) -> str:
@@ -555,16 +582,19 @@ class ReportSynthesizer:
         if ablations:
             lines.append("### Ablations")
             lines.append("")
-            lines.extend(f"- {_esc(a)}" for a in ablations)
+            lines.extend(f"- {self._prose(a)}" for a in ablations)
             lines.append("")
 
         if payload.get("statistical_significance"):
             lines.append(
-                f"**Statistical significance.** {_esc(payload['statistical_significance'])}"
+                "**Statistical significance.** "
+                + self._prose(payload["statistical_significance"], subject="statistical significance")
             )
             lines.append("")
         if payload.get("error_analysis"):
-            lines.append(f"**Error analysis.** {_esc(payload['error_analysis'])}")
+            lines.append(
+                f"**Error analysis.** {self._prose(payload['error_analysis'], subject='error analysis')}"
+            )
             lines.append("")
 
         assessment = payload.get("conclusions_supported")
@@ -574,14 +604,14 @@ class ReportSynthesizer:
             } else assessment
             lines.append(
                 f"**Do the experiments support the paper's conclusions?** {label}. "
-                f"{_esc(payload.get('conclusions_assessment'))}"
+                f"{self._prose(payload.get('conclusions_assessment'))}"
             )
         return "\n".join(lines)
 
     def _limitations(self, agent_results: dict[str, AgentResult], findings: list[Finding]) -> str:
         summary = self._payload(agent_results, AgentName.SUMMARY)
         lines = ["## 8. Limitations and threats to validity", ""]
-        stated = self._prose(summary.get("limitations")) if summary else ""
+        stated = self._prose(summary.get("limitations"), subject="limitations") if summary else ""
         lines.append(
             f"**Stated by the authors.** {stated or '_no limitations were found in the paper_'}"
         )
@@ -726,6 +756,28 @@ class ReportSynthesizer:
         if not details and not grounded:
             lines.append("_The sweep found nothing further that could be grounded in the paper._")
         return "\n".join(lines).rstrip()
+
+    def _add_unmentioned_settings(self, sections: list[str]) -> None:
+        """Append, to section 10, the paper's ``name = value`` settings the report never states."""
+        missing = StatedSettings(self._index).unmentioned("\n".join(sections))
+        position = next((i for i, s in enumerate(sections) if s.startswith("## 10.")), None)
+        if not missing or position is None:
+            return
+        lines = [
+            "",
+            "",
+            "### Settings the paper states that this report does not otherwise mention",
+            "",
+            "_Every `name = value` in the paper's text was compared with the report above; "
+            "these appear nowhere in it. Shown in the paper's own words, found without a model._",
+            "",
+            "| Stated | In the paper | Page |",
+            "| --- | --- | --- |",
+        ]
+        for setting in missing:
+            sentence = setting.sentence if len(setting.sentence) <= 200 else setting.sentence[:197] + "…"
+            lines.append(f"| `{_esc(setting.chain)}` | {_esc(sentence)} | {setting.page} |")
+        sections[position] = sections[position].rstrip() + "\n".join(lines)
 
     def _verified_findings(self, findings: list[Finding]) -> str:
         verified = [
@@ -944,6 +996,25 @@ class ReportSynthesizer:
             )
             lines.append("")
 
+        if self._absence_fixes:
+            lines.append(
+                f"**Absence checks.** {len(self._absence_fixes)} statement(s) said the paper does "
+                "not cover something that it does (an agent sees only the passages retrieved for "
+                "it), or marked a symbol “not defined” that the paper defines; each was replaced "
+                "by where the paper covers it. Checked without a model, against the paper's "
+                "headings, sentences and symbol definitions."
+            )
+            lines.append("")
+
+        if self._number_flags:
+            lines.append(
+                f"**Number checks.** {len(self._number_flags)} statement(s) written without a "
+                "quote pair numbers the paper does not state, or does not state together in one "
+                "table row or sentence; each is flagged ⚠️ where it appears, with the paper's "
+                "own row beside it. Checked without a model."
+            )
+            lines.append("")
+
         diagnostics = [
             d for result in agent_results.values() for d in result.payload.get("diagnostics") or []
         ]
@@ -1120,6 +1191,26 @@ class ReportSynthesizer:
                 lines.append("")
                 lines.append(f"> {_esc(body)}")
                 lines.append("")
+        partial = partly_read_tables(self._index, reported)
+        if partial:
+            lines.append("### Columns of cited tables not read into the results above")
+            lines.append("")
+            lines.append(
+                "_The results above take values from these tables' rows but not from every "
+                "column. The unread columns are shown as extracted (the whole table when most "
+                "of it went unread), so nothing the table states is left out._"
+            )
+            lines.append("")
+            for table in partial:
+                read = ", ".join(table.read_columns) or "none"
+                scope = "the full table" if table.whole else "its unread columns"
+                lines.append(
+                    f"**{_esc(table.caption)[:160]}** [p. {table.page}] — read into the results: "
+                    f"{_esc(read)}; {scope}:"
+                )
+                lines.append("")
+                lines.extend(table.markdown(_esc))
+                lines.append("")
         if figures:
             lines.append("### Figures in the paper")
             lines.append("")
@@ -1145,8 +1236,22 @@ class ReportSynthesizer:
             )
         return "\n".join(lines)
 
-    def _prose(self, text: str | None) -> str:
-        """Escape model-written prose and flag terms of art the paper never uses."""
+    def _prose(
+        self, text: str | None, *, audit: str | None = None, subject: str | None = None
+    ) -> str:
+        """Escape model-written prose and flag what does not match the paper.
+
+        Three checks, all without a model: claims that the paper is silent on
+        something it covers (removed, with where the paper covers it; ``subject``
+        names what a field is about, for a bare "Not explicitly stated"); terms of
+        art the paper never uses; and numbers the paper never states, or never
+        states together (``audit`` is the text to check when it carries more
+        context than the text shown, e.g. a hyperparameter's name with its value).
+        """
+        corrections = []
+        coverage = getattr(self, "_coverage", None)
+        if text and coverage:
+            text, corrections = coverage.check(text, subject=subject)
         body = _esc(text)
         vocabulary = getattr(self, "_vocabulary", None)
         terms = vocabulary.unstated_terms(text) if body and vocabulary else []
@@ -1156,6 +1261,15 @@ class ReportSynthesizer:
                 + ", ".join(f"“{_esc(t)}”" for t in terms)
                 + " — this wording is the system's, not the authors'._"
             )
+        numbers = getattr(self, "_numbers", None)
+        for mismatch in numbers.audit(audit or text) if body and numbers else []:
+            note = mismatch.describe()
+            self._number_flags.append(note)
+            body += f" ⚠️ _Numbers not as in the paper: {_esc(note)}._"
+        for correction in corrections:
+            note = correction.describe()
+            self._absence_fixes.append(note)
+            body = (body + " " if body else "") + f"⚠️ _Corrected: {_esc(note)}._"
         return body
 
     @staticmethod

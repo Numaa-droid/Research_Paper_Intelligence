@@ -128,6 +128,14 @@ MESSAGES: dict[str, Callable[[dict], str]] = {
         f"embeddings: {f.get('embedding_provider')}"
     ),
     "api.shutdown": lambda f: "Server stopped",
+    "api.open_signup": lambda f: (
+        f"No invite code set ({f.get('setting')}): anyone who can reach this port can "
+        "create an account. Fine on localhost; set one before exposing it"
+    ),
+    "accounts.signed_up": lambda f: f"New account {f.get('user_id')}",
+    "accounts.first_user": lambda f: (
+        f"First account {f.get('user_id')} now owns the {f.get('claimed_papers')} earlier paper(s)"
+    ),
     "api.upload": lambda f: f"Upload received: stored as {f.get('document_id')} ({_n(f.get('bytes'))} bytes)",
     "service.upload_registered": lambda f: f"Paper stored as {f.get('document_id')} ({_n(f.get('bytes'))} bytes)",
     "service.analysis_started": lambda f: (
@@ -148,7 +156,13 @@ MESSAGES: dict[str, Callable[[dict], str]] = {
         f"{_count(f.get('tables'), 'table')}, {_count(f.get('figures'), 'figure')}"
         f"{' (' + str(f['ocr_pages']) + ' page(s) read by OCR)' if f.get('ocr_pages') else ''}"
     ),
-    "ingestion.ocr_page": lambda f: f"Page {f.get('page')} has no usable text layer; reading it with OCR",
+    "ingestion.page_flagged": lambda f: (
+        f"Page {f.get('page')} failed the extraction check "
+        f"({_clip('; '.join(f.get('reasons') or []), 120)}); sending it to OCR"
+    ),
+    "ingestion.ocr_page": lambda f: (
+        f"Read page {f.get('page')} with {f.get('engine') or 'OCR'} ({_n(f.get('chars'))} chars)"
+    ),
     "ingestion.figure_ocr": lambda f: (
         f"Read a figure on page {f.get('page')} with OCR ({_n(f.get('chart_rows'))} chart rows)"
     ),

@@ -244,7 +244,49 @@ def test_a_verifier_supporting_a_claim_with_no_real_quote_is_marked_wrong(index)
     )
     score, detail = verification_accuracy(record, index)
     assert score == 0.0
-    assert detail["disagreements"][0]["quote_locatable"] is False
+    assert detail["disagreements"][0]["oracle"] == "ungrounded"
+
+
+def _verdicts(index, status):
+    """One well-grounded claim (its finding quotes the paper) and one fabricated claim."""
+    chunk = next(c for c in index.chunks if "81.4" in c.text)
+    at = chunk.text.index("81.4")
+    quote = chunk.text[max(0, at - 40) : at + 40]
+    findings = [
+        Finding(
+            claim="SRT-Large reaches 81.4 F1",
+            finding_id="f-real",
+            evidence=[Evidence(page=chunk.page, quote=quote, confidence=0.9)],
+        ),
+        Finding(claim="SRT-Large reaches 97.2 F1", finding_id="f-fake"),
+    ]
+    verifications = [
+        VerificationResult(claim=f.claim, finding_id=f.finding_id, status=status) for f in findings
+    ]
+    return _record(findings=findings, verifications=verifications)
+
+
+@pytest.mark.parametrize("status", [FindingStatus.UNSUPPORTED, FindingStatus.SUPPORTED])
+def test_a_verifier_that_always_gives_the_same_verdict_cannot_score_well(index, status):
+    """Abstaining on everything, or approving everything, is half right at best."""
+    score, detail = verification_accuracy(_verdicts(index, status), index)
+    assert score == 0.5
+    assert detail["classes"] == 2
+
+
+def test_the_oracle_grounds_a_claim_from_its_finding_when_the_verifier_cites_nothing(index):
+    record = _verdicts(index, FindingStatus.UNSUPPORTED)
+    record.verification_results[0].status = FindingStatus.SUPPORTED
+    score, _ = verification_accuracy(record, index)
+    assert score == 1.0
+
+
+def test_a_real_quote_does_not_ground_a_claim_whose_number_is_invented(index):
+    record = _verdicts(index, FindingStatus.SUPPORTED)
+    record.verification_results[1].supporting_evidence = list(record.findings[0].evidence)
+    _, detail = verification_accuracy(record, index)
+    wrong = detail["disagreements"][0]
+    assert wrong["oracle"] == "ungrounded" and "97.2" in wrong["reason"]
 
 
 def test_verification_accuracy_is_none_without_verifications(index):

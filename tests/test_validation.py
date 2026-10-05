@@ -105,6 +105,49 @@ def test_a_quote_with_ocr_noise_still_matches_approximately():
     assert match.adjusted_confidence(0.9) < 0.9
 
 
+@pytest.mark.parametrize(
+    "altered",
+    [
+        "SRT-Large reaches 91.4 F1 on NarrativeQA",  # a different result
+        "while increasing attention FLOPs",  # the opposite verb
+        "SRT-Large does not reach 81.4 F1",  # an inserted negation
+        "reaches 81.4 F1 on NarrativeQA while increasing attention FLOPs by 3.1x",
+        "reducing attention FLOPs by 3.7x relative to a dense baseline",
+    ],
+)
+def test_a_near_quote_that_changes_the_claim_is_not_evidence(altered):
+    """Similar characters, different statement: OCR noise never changes a digit or a word."""
+    match = match_quote(altered, SOURCE)
+    assert match.quality is CitationQuality.UNVERIFIABLE
+
+
+def test_a_dropped_negation_is_not_ocr_noise():
+    source = "The router does not improve accuracy on documents under 2k tokens."
+    assert not match_quote("The router does improve accuracy on documents under 2k tokens.", source).found
+    assert not match_quote("The router doesn't improve accuracy", "The router does improve accuracy").found
+    assert match_quote("The router doesn't improve accuracy", source).found
+
+
+def test_pdf_extraction_quirks_are_not_mistaken_for_changed_words():
+    """A dropped range dash, a footnote marker and a split subscript are layout, not content."""
+    source = (
+        "Hemoglobin values (normal range 13.517.5 g/dL) are tabulated, and the dot "
+        "products grow large in magnitude 4 pushing the softmax into regions with "
+        "extremely small gradients, scaled by d-0.5 model for stablity."
+    )
+    quote = (
+        "Hemoglobin values (normal range 13.5-17.5 g/dL) are tabulated, and the dot "
+        "products grow large in magnitude pushing the softmax into regions with "
+        "extremely small gradients, scaled by d^-0.5_model for stability."
+    )
+    assert match_quote(quote, source).quality is CitationQuality.APPROXIMATE
+
+
+def test_an_elided_quote_cannot_smuggle_a_number_in_a_short_part():
+    match = match_quote("SRT-Large reaches ... 91.4 F1 ... on NarrativeQA while reducing", SOURCE)
+    assert not match.found
+
+
 # --- numeric validation ----------------------------------------------------
 
 
@@ -320,6 +363,27 @@ def test_a_finding_whose_quotes_are_all_fake_is_downgraded(index):
         evidence=[Evidence(page=1, quote="Nothing like this is in the paper.", confidence=0.9)],
     )
     validate_finding(finding, index)
+    assert finding.status is FindingStatus.UNSUPPORTED
+
+
+def test_a_misquoted_number_is_neither_a_citation_nor_numeric_support(index):
+    """The quote's wrong digit must not ground the claim's wrong digit."""
+    chunk = next(c for c in index.chunks if "81.4" in c.text)
+    finding = Finding(
+        claim="SRT-Large reaches 91.4 F1 on NarrativeQA",
+        status=FindingStatus.SUPPORTED,
+        confidence=0.9,
+        evidence=[
+            Evidence(
+                page=chunk.page,
+                chunk_id=chunk.chunk_id,
+                quote="SRT-Large reaches 91.4 F1 on NarrativeQA",
+                confidence=0.9,
+            )
+        ],
+    )
+    validate_finding(finding, index)
+    assert finding.evidence[0].citation_quality is CitationQuality.UNVERIFIABLE
     assert finding.status is FindingStatus.UNSUPPORTED
 
 

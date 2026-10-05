@@ -27,7 +27,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ocr = ["pytesseract>=0.3.10", "pillow>=10.0"]
 # Document layout analysis (PP-Structure). Pinned rather than bounded: a new
 # model or release finds different regions, which would change the parse of a
 # paper under the caller without a line of PaperPilot changing.
@@ -38,6 +37,8 @@ faiss = ["faiss-cpu>=1.8"]
 qdrant = ["qdrant-client>=1.9"]
 rerank = ["flashrank>=0.2.5"]
 langgraph = ["langgraph>=0.1"]
+# PostgreSQL storage, e.g. Supabase (PAPERPILOT_DATABASE_URL=postgresql://...).
+postgres = ["psycopg[binary]>=3.1", "psycopg-pool>=3.2"]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0",

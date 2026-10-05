@@ -185,3 +185,85 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
     details: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalysisSummary(BaseModel):
+    """One row of the runs list: enough for a table, without the event stream."""
+
+    analysis_id: str
+    document_id: str
+    title: str | None = None
+    status: AnalysisStatus
+    stage: str = "pending"
+    progress: float = 0.0
+    created_at: datetime
+    completed_at: datetime | None = None
+    duration_seconds: float | None = None
+    findings: int = 0
+    finding_counts: dict[str, int] = Field(default_factory=dict)
+    #: Share of findings supported or partially supported by verified evidence.
+    grounded_rate: float | None = None
+    total_tokens: int = 0
+    estimated_cost_usd: float | None = None
+
+    @classmethod
+    def from_record(cls, record: AnalysisRecord, title: str | None) -> AnalysisSummary:
+        stats = record.stats()
+        counts = stats["status_counts"]
+        grounded = counts.get("supported", 0) + counts.get("partially_supported", 0)
+        costs = [u.estimated_cost_usd for u in record.usage if u.estimated_cost_usd is not None]
+        return cls(
+            analysis_id=record.analysis_id,
+            document_id=record.document_id,
+            title=title,
+            status=record.status,
+            stage=record.events[-1].stage if record.events else "pending",
+            progress=_progress(record),
+            created_at=record.created_at,
+            completed_at=record.completed_at,
+            duration_seconds=record.duration_seconds,
+            findings=stats["findings"],
+            finding_counts=counts,
+            grounded_rate=round(grounded / stats["findings"], 4) if stats["findings"] else None,
+            total_tokens=stats["total_tokens"],
+            estimated_cost_usd=round(sum(costs), 6) if costs else None,
+        )
+
+
+# --- accounts ---------------------------------------------------------------
+
+
+class SignUpRequest(BaseModel):
+    name: str = Field(max_length=200)
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=1024)
+    invite_code: str | None = Field(default=None, max_length=1024)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=1024)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(max_length=1024)
+    new_password: str = Field(max_length=1024)
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    email: str
+    name: str
+    created_at: datetime
+
+
+class AuthResponse(BaseModel):
+    user: UserResponse
+    #: The session token, for scripts: send it as ``Authorization: Bearer``.
+    #: Browsers use the HttpOnly cookie set alongside and can ignore it.
+    token: str
+
+
+class AuthConfigResponse(BaseModel):
+    invite_required: bool
+    min_password_length: int

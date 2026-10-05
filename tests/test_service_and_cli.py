@@ -287,6 +287,11 @@ def test_cli_ingest_json_format(tmp_path, paper_pdf, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["metadata"]["page_count"] == 6
     assert payload["chunks"]
+    assert payload["extraction"]["ocr_engine"] in ("paddleocr_vl", "null")
+    pages = payload["pages"]
+    assert [p["page"] for p in pages] == list(range(1, 7))
+    assert all(p["source"] == "native_text" and p["extraction_failures"] == [] for p in pages)
+    assert all(p["text"] for p in pages)
 
 
 def test_cli_progress_printer_renders_stages(capsys):

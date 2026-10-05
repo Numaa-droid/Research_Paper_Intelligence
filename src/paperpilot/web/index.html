@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PaperMind · Mission Control</title>
+<title>PaperMind</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6b5f'/%3E%3Cpath d='M26 6 5 15.5l7 2.5L26 6Zm0 0L12 18l1 7.5 3.6-5 5.4 2.5L26 6Z' fill='%23fff'/%3E%3C/svg%3E">
 <script>
   // Apply the saved theme before first paint so there is no flash.
@@ -123,13 +123,6 @@ kbd {
 }
 
 /* ============================================================ top bar */
-.topbar {
-  position: sticky; top: 0; z-index: 30;
-  background: color-mix(in srgb, var(--bg) 76%, transparent);
-  backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-}
-.topbar-inner { display: flex; align-items: center; gap: 14px; height: 62px; }
 .brand {
   display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink);
   font-weight: 700; font-size: 17px; letter-spacing: -.01em;
@@ -182,31 +175,8 @@ kbd {
 .theme-opt b { font-size: 13px; }
 .theme-opt small { font-size: 11px; color: var(--muted); line-height: 1.3; }
 @keyframes popIn { from { opacity: 0; transform: scale(.96) translateY(-4px); } }
-@media (max-width: 760px) { .sys { display: none; } .theme-wrap { margin-left: auto; } }
 
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
-
-/* ============================================================ hero */
-.hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 44px; align-items: center; padding-block: 54px 34px; }
-.hero h1 {
-  font: 600 clamp(38px, 5.2vw, 60px)/1.03 var(--display); letter-spacing: -.028em; margin: 0 0 18px;
-}
-[data-theme="terminal"] .hero h1 { font-size: clamp(30px, 4.2vw, 46px); letter-spacing: -.02em; }
-.hero h1 em {
-  font-style: italic; background: linear-gradient(100deg, var(--accent), var(--accent-2));
-  -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .06em;
-}
-[data-theme="terminal"] .hero h1 em { font-style: normal; }
-[data-theme="terminal"] .hero h1::after { content: "_"; color: var(--accent); animation: blink 1s steps(1) infinite; }
-.lede { font-size: 17px; color: var(--muted); max-width: 52ch; margin: 0 0 24px; }
-.pillars { display: flex; flex-wrap: wrap; gap: 8px; }
-.pillar {
-  display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
-  padding: 6px 12px 6px 8px; border-radius: 999px; border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
-}
-.pillar svg { width: 16px; height: 16px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-@media (max-width: 920px) { .hero { grid-template-columns: 1fr; gap: 28px; padding-block: 32px 22px; } }
 
 .card {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
@@ -263,19 +233,9 @@ kbd {
 .btn:active:not(:disabled) { transform: scale(.98); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.sm { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 9px; }
+a.btn, a.linkish { text-decoration: none; }
+a.linkish:hover { text-decoration: underline; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.recent { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
-.recent h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.recent ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.recent button {
-  width: 100%; display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 10px;
-  padding: 7px 8px; border: 0; border-radius: 9px; background: transparent; cursor: pointer; text-align: left; font-size: 13.5px;
-}
-.recent button:hover { background: var(--panel-2); }
-.recent .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--faint)); }
-.recent .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recent time { font-size: 12px; color: var(--faint); }
 
 .banners { display: grid; gap: 8px; margin-bottom: 14px; }
 .banner {
@@ -680,6 +640,400 @@ details.banner button { position: absolute; right: 10px; top: 8px; }
 footer.foot { padding-block: 40px 30px; color: var(--faint); font-size: 12.5px; text-align: center; }
 footer.foot a { color: var(--muted); }
 
+/* ============================================================ boot */
+.boot { position: fixed; inset: 0; display: grid; place-items: center; z-index: 60; background: var(--bg); transition: opacity .35s; }
+.boot.out { opacity: 0; pointer-events: none; }
+.boot svg { width: 46px; height: 46px; animation: bob 1.4s ease-in-out infinite; }
+.boot .plane { fill: var(--accent); }
+.boot .plane-fold { fill: var(--accent-ink); opacity: .35; }
+@keyframes bob { 50% { transform: translate(4px, -6px) rotate(-6deg); } }
+
+/* ============================================================ forms */
+.field { display: grid; gap: 6px; }
+.field > span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.input {
+  position: relative; display: flex; align-items: center; height: 46px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel-2); transition: border-color .2s, box-shadow .2s, background-color .2s;
+}
+.input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); background: var(--panel); }
+.input > svg { width: 18px; height: 18px; margin: 0 2px 0 14px; flex: none; fill: none; stroke: var(--faint); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s; }
+.input:focus-within > svg { stroke: var(--accent); }
+.input input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 15px; padding: 0 12px 0 10px; }
+.input input::placeholder { color: var(--faint); }
+.input.invalid { border-color: var(--bad); box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 14%, transparent); }
+.peek { border: 0; background: none; cursor: pointer; width: 42px; height: 100%; display: grid; place-items: center; color: var(--faint); border-radius: 0 12px 12px 0; }
+.peek:hover { color: var(--ink); }
+.peek svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.peek .off { display: none; }
+.peek[aria-pressed="true"] .on { display: none; }
+.peek[aria-pressed="true"] .off { display: block; }
+.strength { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 5px; align-items: center; margin-top: 2px; }
+.strength i { height: 4px; border-radius: 4px; background: var(--line); transition: background-color .25s; }
+.strength small { font-size: 11.5px; color: var(--muted); min-width: 64px; text-align: right; }
+.strength[data-score="1"] i:nth-child(-n+1) { background: var(--bad); }
+.strength[data-score="2"] i:nth-child(-n+2) { background: var(--warn); }
+.strength[data-score="3"] i:nth-child(-n+3) { background: var(--info); }
+.strength[data-score="4"] i { background: var(--ok); }
+.form-error {
+  margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; animation: shakeX .4s;
+  color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--bad) 30%, transparent);
+}
+.form-ok { margin: 0; font-size: 13.5px; color: var(--ok); }
+@keyframes shakeX { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+.btn.block { width: 100%; }
+.btn.lg { height: 50px; font-size: 15px; border-radius: 13px; }
+.btn .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; }
+.btn.danger { background: transparent; border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); color: var(--bad); }
+.btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+
+/* ============================================================ auth */
+.auth { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); }
+.auth-art {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 34px; padding: 34px clamp(24px, 5vw, 64px) 40px;
+  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background:
+    radial-gradient(900px 520px at 85% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(700px 520px at -10% 110%, color-mix(in srgb, var(--accent-2) 24%, transparent), transparent 70%),
+    color-mix(in srgb, var(--bg-2) 60%, var(--bg));
+}
+.auth-art::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 44px 44px; mask-image: radial-gradient(ellipse at 60% 45%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at 60% 45%, #000 20%, transparent 75%);
+}
+.auth-art > * { position: relative; }
+.auth-copy h1 { font: 600 clamp(36px, 4.6vw, 58px)/1.03 var(--display); letter-spacing: -.028em; margin: 0 0 16px; }
+.auth-copy h1 em {
+  font-style: italic; background: linear-gradient(100deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .06em;
+}
+[data-theme="terminal"] .auth-copy h1 em { font-style: normal; }
+.auth-copy .lede { margin: 0; }
+.lede { font-size: 17px; color: var(--muted); max-width: 52ch; margin: 0 0 24px; }
+.auth-points { list-style: none; margin: auto 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.auth-points li { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.auth-points b { color: var(--ink); font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.auth-points svg { width: 18px; height: 18px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The proof card: a claim being checked against its quote, on a loop. */
+.proof { position: relative; max-width: 560px; padding: 26px 0 30px; }
+.proof-card {
+  position: relative; padding: 18px 20px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line);
+  box-shadow: 0 30px 70px -30px rgb(0 0 0 / .45), var(--shadow); transform: rotate(-1.2deg);
+  animation: floaty 7s ease-in-out infinite;
+}
+[data-theme="aurora"] .proof-card { background: rgb(26 20 56 / .85); backdrop-filter: blur(16px); }
+@keyframes floaty { 50% { transform: rotate(-.4deg) translateY(-6px); } }
+.proof-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.proof-agent { font: 600 11px var(--font); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.proof-agent::before { content: ""; width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+.proof-verdict { --c: var(--accent); display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); border: 1px solid color-mix(in srgb, var(--c) 32%, transparent); transition: all .35s; }
+.proof-verdict i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.proof-verdict[data-s="checking"] i { animation: ping 1.2s ease-out infinite; }
+.proof-verdict[data-s="supported"] { --c: var(--ok); }
+.proof-verdict[data-s="unsupported"] { --c: var(--warn); }
+.proof-verdict[data-s="supported"], .proof-verdict[data-s="unsupported"] { animation: pop .45s cubic-bezier(.2,.9,.3,1.4); }
+.proof-claim { margin: 0 0 12px; font-size: 16px; line-height: 1.45; font-weight: 600; min-height: 46px; }
+.proof-quote {
+  position: relative; margin: 0; padding: 11px 14px; border-radius: 0 12px 12px 0; overflow: hidden;
+  font: 14px/1.55 var(--display); color: var(--muted); border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent); min-height: 70px;
+}
+[data-theme="midnight"] .proof-quote, [data-theme="aurora"] .proof-quote, [data-theme="terminal"] .proof-quote { font-family: var(--font); }
+.proof-quote mark { background: color-mix(in srgb, var(--accent-2) 32%, transparent); color: var(--ink); border-radius: 3px; padding: 0 2px; }
+.proof-quote::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 40%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+}
+.proof.scanning .proof-quote::after { animation: scan 1.3s ease-in-out infinite; }
+@keyframes scan { to { left: 110%; } }
+.proof-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--faint); }
+.proof-chip {
+  position: absolute; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+  animation: floaty 6s ease-in-out infinite;
+}
+.proof-chip.c1 { right: -14px; top: -2px; color: var(--ok); animation-delay: -1s; }
+.proof-chip.c2 { left: -18px; bottom: 2px; color: var(--warn); animation-delay: -3s; }
+.proof-chip.c3 { right: 26px; bottom: -8px; color: var(--bad); animation-delay: -4.5s; }
+
+.auth-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 40px clamp(20px, 4vw, 56px); }
+.auth-card { width: min(430px, 100%); padding: 28px; display: grid; gap: 18px; animation: rise .5s cubic-bezier(.2,.7,.2,1); }
+.auth-card h2 { margin: 0 0 4px; font: 600 27px/1.15 var(--display); letter-spacing: -.015em; }
+.auth-card .head p { margin: 0; }
+.auth-seg { display: grid; grid-template-columns: 1fr 1fr; }
+.auth-seg button { padding: 8px 10px; font-size: 13.5px; }
+#authForm { display: grid; gap: 14px; }
+.auth-switch { margin: 0; text-align: center; font-size: 13.5px; color: var(--muted); }
+.auth-switch .linkish { font-size: 13.5px; }
+.auth-foot { margin: 0; text-align: center; max-width: 40ch; }
+.auth-mobile-brand { display: none; }
+@media (max-width: 960px) {
+  .auth { grid-template-columns: 1fr; }
+  .auth-art { display: none; }
+  .auth-mobile-brand { display: flex; }
+  .auth-panel { justify-content: flex-start; padding-top: 32px; }
+}
+
+/* ============================================================ app shell */
+.app { position: relative; z-index: 1; display: grid; grid-template-columns: 256px minmax(0, 1fr); min-height: 100vh; }
+.sidebar {
+  position: sticky; top: 0; height: 100vh; z-index: 40; display: flex; flex-direction: column; gap: 14px; padding: 18px 14px 14px;
+  border-right: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  overflow-y: auto;
+}
+.sidebar .brand { padding: 2px 8px 4px; }
+.side-new { justify-content: flex-start; padding: 0 14px; text-decoration: none; }
+.side-new kbd { margin-left: auto; background: color-mix(in srgb, var(--accent-ink) 18%, transparent); border-color: transparent; color: inherit; opacity: .8; }
+.nav { display: grid; gap: 2px; }
+.nav-label { font: 600 10.5px var(--font); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 10px 10px 6px; }
+.nav a {
+  position: relative; display: flex; align-items: center; gap: 11px; height: 40px; padding: 0 12px; border-radius: 11px;
+  color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; transition: background-color .2s, color .2s;
+}
+.nav a svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; transition: transform .25s; }
+.nav a:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ink); }
+.nav a:hover svg { transform: translateX(1px) scale(1.06); }
+.nav a[aria-current="page"] { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--ink); }
+.nav a[aria-current="page"] svg { color: var(--accent); }
+.nav a[aria-current="page"]::before { content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.nav .count { margin-left: auto; font-size: 11.5px; font-weight: 600; min-width: 22px; height: 20px; padding: 0 7px; border-radius: 999px; display: grid; place-items: center; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); }
+.nav .count.live { color: var(--accent-ink); background: var(--accent); border-color: transparent; animation: ping 1.6s ease-out infinite; --c: var(--accent); }
+.nav .ext { margin-left: auto; width: 14px; height: 14px; opacity: .6; }
+.side-foot { margin-top: auto; display: grid; gap: 8px; }
+.me { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--line); }
+.me b, .me small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me b { font-size: 13.5px; }
+.me small { font-size: 12px; color: var(--muted); }
+.avatar {
+  width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  font: 700 14px var(--font); color: #fff; letter-spacing: .02em;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 16px -8px var(--glow);
+}
+.avatar.xl { width: 72px; height: 72px; border-radius: 22px; font-size: 26px; }
+.me .icon-btn { width: 34px; height: 34px; border-radius: 10px; }
+.me .icon-btn svg { width: 16px; height: 16px; }
+.scrim { position: fixed; inset: 0; z-index: 35; background: rgb(0 0 0 / .4); backdrop-filter: blur(2px); animation: feedIn .2s; }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; height: 62px; padding: 0 24px;
+  background: color-mix(in srgb, var(--bg) 76%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.menu-btn { display: none; }
+.crumb { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.crumb span { color: var(--faint); font-weight: 500; margin: 0 6px; }
+.jump {
+  display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 8px 0 12px; margin-left: auto; min-width: 250px;
+  border-radius: 11px; border: 1px solid var(--line); background: var(--panel-2); color: var(--faint); cursor: pointer; font-size: 13.5px;
+  transition: border-color .2s, color .2s;
+}
+.jump:hover { border-color: var(--accent); color: var(--muted); }
+.jump svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.jump kbd { margin-left: auto; }
+.topbar .sys { margin-left: 0; flex-wrap: nowrap; flex: none; }
+.crumb { flex: 0 1 auto; }
+.page { width: 100%; max-width: 1280px; margin: 0 auto; padding: 28px 32px 40px; }
+.page-banners { margin: 16px 32px 0; }
+.page-banners:empty { display: none; }
+.view { animation: viewIn .35s cubic-bezier(.2,.7,.2,1); }
+@keyframes viewIn { from { opacity: 0; transform: translateY(8px); } }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 14px 20px; margin-bottom: 22px; }
+.page-head h1 { font: 600 clamp(28px, 3.2vw, 36px)/1.1 var(--display); letter-spacing: -.022em; margin: 0 0 6px; }
+.page-head p { margin: 0; }
+.panel { padding: 18px 20px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.panel-head h2 { margin: 0; font-size: 15px; letter-spacing: -.005em; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.empty-state { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 46px 20px; color: var(--muted); }
+.empty-state .es-icon { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.empty-state .es-icon svg { width: 30px; height: 30px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.empty-state h3 { margin: 4px 0 0; color: var(--ink); font-size: 17px; }
+.empty-state p { margin: 0; max-width: 42ch; }
+.skeleton { border-radius: 10px; background: linear-gradient(90deg, var(--panel-2), color-mix(in srgb, var(--line) 60%, var(--panel-2)), var(--panel-2)); background-size: 200% 100%; animation: shimmerBg 1.3s linear infinite; }
+@keyframes shimmerBg { to { background-position: -200% 0; } }
+
+@media (max-width: 1100px) { .topbar .sys { display: none; } }
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 272px; transform: translateX(-102%); transition: transform .3s cubic-bezier(.2,.7,.2,1); background: var(--panel); }
+  .app.nav-open .sidebar { transform: none; box-shadow: 30px 0 60px -20px rgb(0 0 0 / .4); }
+  .menu-btn { display: grid; }
+  .jump { min-width: 0; width: 40px; padding: 0; justify-content: center; }
+  .jump span, .jump kbd { display: none; }
+  .topbar { padding: 0 16px; }
+  .page { padding: 20px 16px 32px; }
+  .page-banners { margin: 12px 16px 0; }
+}
+
+/* ============================================================ status pills (runs) */
+.pill { --c: var(--muted); display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); border: 1px solid color-mix(in srgb, var(--c) 28%, transparent); }
+.pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.pill.ok { --c: var(--ok); } .pill.bad { --c: var(--bad); } .pill.run { --c: var(--accent); } .pill.wait { --c: var(--faint); }
+.pill.run i { animation: ping 1.4s ease-out infinite; }
+.meter { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-size: 13px; }
+.meter .track { flex: 1; height: 6px; min-width: 50px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.meter .track i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+/* ============================================================ home */
+.hello { font: 600 clamp(30px, 3.6vw, 40px)/1.08 var(--display); letter-spacing: -.025em; }
+.hello em { font-style: italic; background: linear-gradient(100deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .05em; }
+[data-theme="terminal"] .hello em { font-style: normal; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) {
+  .kpis { gap: 10px; }
+  .kpi { padding: 14px; }
+  .kpi strong { font-size: 24px; }
+  .kpi .k-icon, .kpi .ring { display: none; }
+}
+.kpi { position: relative; overflow: hidden; padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; animation: rise .55s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i) * 70ms); }
+.kpi::after { content: ""; position: absolute; right: -30px; bottom: -40px; width: 110px; height: 110px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%); }
+.kpi .k-label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.kpi strong { font: 700 30px/1.15 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.kpi small { grid-column: 1; font-size: 12px; color: var(--faint); }
+.kpi .k-icon { grid-row: 1 / span 3; grid-column: 2; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); position: relative; z-index: 1; }
+.kpi .k-icon svg { width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.kpi .ring { grid-row: 1 / span 3; grid-column: 2; width: 52px; height: 52px; position: relative; z-index: 1; }
+.kpi .ring circle { fill: none; stroke-width: 6; }
+.kpi .ring .r-track { stroke: var(--line); }
+.kpi .ring .r-fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(.2,.7,.2,1); }
+.home-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 1000px) { .home-grid { grid-template-columns: minmax(0, 1fr); } }
+.home-side { display: grid; gap: 18px; }
+.start-card {
+  position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center;
+  padding: 20px; text-decoration: none; color: var(--ink); transition: transform .25s, border-color .25s;
+  background: radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%), var(--panel);
+}
+.start-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.start-card .dz-icon { margin: 0; width: 58px; height: 58px; }
+.start-card:hover .dz-icon { transform: translateY(-3px) rotate(-5deg); }
+.start-card b { display: block; font-size: 16px; margin-bottom: 2px; }
+.start-card span { font-size: 13px; color: var(--muted); }
+
+.runlist { display: grid; gap: 2px; margin: 0 -8px; }
+.runrow {
+  display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 8px;
+  border-radius: 12px; text-decoration: none; color: var(--ink); transition: background-color .2s;
+  animation: feedIn .35s ease-out both; animation-delay: calc(var(--i) * 40ms);
+}
+.runrow:hover { background: var(--panel-2); }
+.runrow .doc-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font: 700 15px var(--display); color: #fff; background: var(--cover, var(--accent)); }
+.runrow .rr-main { min-width: 0; }
+.runrow .rr-main b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runrow .rr-main small { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+.runrow .rr-side { display: grid; justify-items: end; gap: 4px; }
+.runrow .rr-side small { font-size: 12px; color: var(--faint); }
+
+/* ============================================================ new analysis */
+.new-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 960px) { .new-grid { grid-template-columns: minmax(0, 1fr); } }
+.launch .dropzone { min-height: 320px; }
+.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.flow li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding-bottom: 16px; position: relative; }
+.flow li:not(:last-child)::before { content: ""; position: absolute; left: 19px; top: 40px; bottom: 0; width: 2px; background: linear-gradient(var(--line), transparent); }
+.flow .f-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line); }
+.flow .f-ico svg { width: 19px; height: 19px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.flow b { display: block; font-size: 14px; margin: 2px 0 2px; }
+.flow span { font-size: 13px; color: var(--muted); }
+.tips { display: grid; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.tips b { color: var(--ink); }
+
+/* ============================================================ library */
+.papers { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
+.paper {
+  display: flex; flex-direction: column; overflow: hidden; padding: 0; animation: rise .45s cubic-bezier(.2,.7,.2,1) both;
+  animation-delay: calc(min(var(--i), 12) * 45ms); transition: transform .25s, border-color .25s, box-shadow .25s;
+}
+.paper:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); box-shadow: 0 24px 50px -24px var(--glow); }
+.cover {
+  position: relative; height: 128px; overflow: hidden; color: #fff; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;
+  background: var(--cover);
+}
+.cover::before {
+  content: ""; position: absolute; inset: 0; opacity: .22;
+  background: repeating-linear-gradient(0deg, transparent 0 13px, rgb(255 255 255 / .55) 13px 14px);
+  mask-image: linear-gradient(100deg, transparent 30%, #000 90%); -webkit-mask-image: linear-gradient(100deg, transparent 30%, #000 90%);
+}
+.cover .mono { position: absolute; right: 12px; bottom: -22px; font: 700 110px/1 var(--display); opacity: .22; letter-spacing: -.04em; }
+.cover .c-top { position: relative; display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .9; }
+.cover .c-title { position: relative; font: 600 17px/1.25 var(--display); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 1px 12px rgb(0 0 0 / .25); }
+.paper-body { padding: 12px 16px 14px; display: grid; gap: 10px; flex: 1; }
+.paper-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+.paper-file { font-size: 12px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paper-status { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.paper-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; }
+.paper-foot .btn { flex: 1; }
+
+/* ============================================================ runs */
+.runs-card { padding: 4px; overflow: hidden; }
+.runs-head, .runs-row {
+  display: grid; grid-template-columns: minmax(0, 2.4fr) 130px 82px minmax(110px, 1fr) 84px 84px 96px; gap: 14px; align-items: center; padding: 10px 14px;
+}
+.runs-head { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 700; border-bottom: 1px solid var(--line); }
+.runs-row { border-radius: 12px; text-decoration: none; color: var(--ink); font-size: 13.5px; font-variant-numeric: tabular-nums; transition: background-color .2s; animation: feedIn .3s ease-out both; animation-delay: calc(min(var(--i), 14) * 30ms); }
+.runs-row:hover { background: var(--panel-2); }
+.runs-row .r-paper { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.runs-row .r-paper .doc-ico { width: 34px; height: 34px; border-radius: 10px; flex: none; display: grid; place-items: center; font: 700 14px var(--display); color: #fff; background: var(--cover); }
+.runs-row .r-paper b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.runs-row .r-paper small { display: block; color: var(--faint); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runs-row .r-num { color: var(--muted); }
+.runs-row .r-prog { display: grid; gap: 4px; }
+.runs-row .r-prog .progress { height: 3px; }
+.lbl { display: none; }
+@media (max-width: 1000px) {
+  .runs-head { display: none; }
+  .runs-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; padding: 14px; border-bottom: 1px solid var(--line); border-radius: 0; }
+  .runs-row:last-child { border-bottom: 0; }
+  .runs-row .r-paper { grid-column: 1 / -1; }
+  .runs-row > :not(.r-paper) { display: grid; gap: 2px; }
+  .lbl { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+}
+
+/* ============================================================ run view */
+.run-crumbs { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.run-crumbs a { text-decoration: none; }
+
+/* ============================================================ settings */
+.settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.settings .span2 { grid-column: 1 / -1; }
+@media (max-width: 900px) { .settings { grid-template-columns: minmax(0, 1fr); } }
+.profile { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 18px; align-items: center; }
+.profile h2 { margin: 0; font: 600 22px/1.2 var(--display); overflow-wrap: anywhere; }
+.profile p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; overflow-wrap: anywhere; }
+.profile dl { grid-column: 1 / -1; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.profile dl div { padding: 10px 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); min-width: 0; }
+.profile dt { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.profile dd { margin: 2px 0 0; font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.profile .actions { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; }
+#pwForm { display: grid; gap: 12px; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
+.theme-grid .theme-prev { height: 70px; }
+
+/* ============================================================ command palette */
+.palette { position: fixed; inset: 0; z-index: 70; display: grid; justify-items: center; align-items: start; padding: 12vh 16px 16px; background: rgb(0 0 0 / .38); backdrop-filter: blur(4px); animation: feedIn .15s; }
+.palette-box { width: min(620px, 100%); overflow: hidden; padding: 0; animation: popIn .18s ease-out; box-shadow: 0 40px 90px -20px rgb(0 0 0 / .55); }
+[data-theme="aurora"] .palette-box { background: #150f33; }
+.palette-input { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 58px; border-bottom: 1px solid var(--line); }
+.palette-input svg { width: 19px; height: 19px; fill: none; stroke: var(--faint); stroke-width: 2; stroke-linecap: round; flex: none; }
+.palette-input input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--ink); font: inherit; font-size: 16px; }
+.palette-list { list-style: none; margin: 0; padding: 8px; max-height: min(420px, 60vh); overflow-y: auto; }
+.palette-list .grp { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 700; padding: 10px 10px 4px; }
+.palette-list .opt { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+.palette-list .opt[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.palette-list .opt .o-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line); font: 700 12px var(--display); color: var(--muted); }
+.palette-list .opt .o-ico svg { width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.palette-list .opt b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-list .opt small { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-list .opt kbd, .palette-list .opt .pill { justify-self: end; }
+.palette-empty { padding: 28px; text-align: center; color: var(--faint); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
@@ -688,46 +1042,191 @@ footer.foot a { color: var(--muted); }
 <body>
 <div class="ambient" aria-hidden="true"></div>
 
-<header class="topbar">
-  <div class="shell topbar-inner">
-    <a class="brand" href="#" id="brand" aria-label="PaperMind home">
-      <svg viewBox="0 0 32 32" aria-hidden="true">
+<div class="boot" id="boot" aria-hidden="true">
+  <svg viewBox="0 0 32 32"><g class="plane"><path d="M29 3 3 14.5l9 3.2L29 3Z"/><path d="M29 3 12 17.7l1.3 9.3 4.4-6.2 6.8 3.2L29 3Z"/><path class="plane-fold" d="m12 17.7 1.3 9.3 4.4-6.2L29 3 12 17.7Z"/></g></svg>
+</div>
+
+<!-- ================================================================ sign in -->
+<div class="auth" id="authView" hidden>
+  <section class="auth-art">
+    <a class="brand" href="#" aria-label="PaperMind"><svg viewBox="0 0 32 32" aria-hidden="true">
         <path class="trail" d="M2 27c4-1 6-3 8-6"/>
         <g class="plane">
           <path d="M29 3 3 14.5l9 3.2L29 3Z"/>
           <path d="M29 3 12 17.7l1.3 9.3 4.4-6.2 6.8 3.2L29 3Z"/>
           <path class="plane-fold" d="m12 17.7 1.3 9.3 4.4-6.2L29 3 12 17.7Z"/>
         </g>
-      </svg>
-      <span>PaperMind</span>
-    </a>
-    <div class="sys" id="sys"></div>
-    <div class="theme-wrap">
-      <button class="icon-btn" id="themeBtn" aria-haspopup="true" aria-expanded="false" aria-controls="themePop" title="Change theme (T)">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7.5" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg>
-      </button>
-      <div class="theme-pop" id="themePop" role="menu" hidden></div>
-    </div>
-  </div>
-</header>
-
-<main class="shell">
-  <section class="hero">
-    <div>
+      </svg><span>PaperMind</span></a>
+    <div class="auth-copy">
       <p class="eyebrow">Multi-agent · citation-grounded</p>
       <h1>Read a paper.<br><em>Trust every claim.</em></h1>
-      <p class="lede">
-        Drop in a research PDF and watch a team of specialist agents plan, analyse and
-        cross-examine it. Anything they can't ground in the paper's own text is flagged, not hidden.
-      </p>
-      <div class="pillars">
-        <span class="pillar"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>Quotes re-checked against the PDF</span>
-        <span class="pillar"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Self-correcting retries</span>
-        <span class="pillar"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>Page-level citations</span>
+      <p class="lede">Specialist agents read your PDF, cite the page behind every finding, and flag whatever the paper doesn't actually say.</p>
+    </div>
+    <div class="proof" id="proof" aria-hidden="true">
+      <div class="proof-card">
+        <div class="proof-head">
+          <span class="proof-agent" id="proofAgent">Experiments agent</span>
+          <span class="proof-verdict" id="proofVerdict" data-s="checking"><i></i><b>Checking…</b></span>
+        </div>
+        <p class="proof-claim" id="proofClaim"></p>
+        <blockquote class="proof-quote" id="proofQuote"></blockquote>
+        <div class="proof-foot"><span id="proofCite"></span><span id="proofQuality"></span></div>
+      </div>
+      <span class="proof-chip c1">✓ Quote found on p. 4</span>
+      <span class="proof-chip c2">↻ Retried with feedback</span>
+      <span class="proof-chip c3">✕ 99.9% is not in the paper</span>
+    </div>
+    <ul class="auth-points">
+      <li><b><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>Re-checked quotes</b>Every citation is matched against the PDF's own text, digit for digit.</li>
+      <li><b><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Self-correcting</b>Agents whose claims don't hold up are re-run with the reasons.</li>
+      <li><b><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>Page-level citations</b>Each finding points at the page and section it came from.</li>
+    </ul>
+  </section>
+
+  <section class="auth-panel">
+    <a class="brand auth-mobile-brand" href="#" aria-label="PaperMind"><svg viewBox="0 0 32 32" aria-hidden="true">
+        <path class="trail" d="M2 27c4-1 6-3 8-6"/>
+        <g class="plane">
+          <path d="M29 3 3 14.5l9 3.2L29 3Z"/>
+          <path d="M29 3 12 17.7l1.3 9.3 4.4-6.2 6.8 3.2L29 3Z"/>
+          <path class="plane-fold" d="m12 17.7 1.3 9.3 4.4-6.2L29 3 12 17.7Z"/>
+        </g>
+      </svg><span>PaperMind</span></a>
+    <div class="card auth-card">
+      <div class="seg auth-seg" role="group" aria-label="Sign in or create an account">
+        <button type="button" data-mode="login">Sign in</button>
+        <button type="button" data-mode="signup">Create account</button>
+      </div>
+      <div class="head">
+        <h2 id="authTitle">Welcome back</h2>
+        <p class="muted" id="authSub">Sign in to your library of analysed papers.</p>
+      </div>
+      <form id="authForm" novalidate>
+        <label class="field" data-only="signup">
+          <span>Name</span>
+          <div class="input"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input name="name" autocomplete="name" placeholder="Ada Lovelace" maxlength="80"></div>
+        </label>
+        <label class="field">
+          <span>Email</span>
+          <div class="input"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><input name="email" type="email" autocomplete="email" placeholder="you@university.edu" required></div>
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <div class="input"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><input name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            <button type="button" class="peek" aria-label="Show password" aria-pressed="false">
+              <svg class="on" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+            </button>
+          </div>
+          <div class="strength" id="strength" data-only="signup" data-score="0"><i></i><i></i><i></i><i></i><small id="strengthText"></small></div>
+        </label>
+        <label class="field" data-only="signup" id="inviteField">
+          <span>Invite code</span>
+          <div class="input"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M15 8l3 3M18 5l2 2"/></svg><input name="invite_code" autocomplete="off" placeholder="From whoever runs this server"></div>
+        </label>
+        <p class="form-error" id="authError" role="alert" hidden></p>
+        <button class="btn primary block lg" id="authSubmit" type="submit"><span id="authSubmitText">Sign in</span><svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></button>
+      </form>
+      <p class="auth-switch" id="authSwitch"></p>
+    </div>
+    <p class="auth-foot muted small">PaperMind verifies claims only against the PDF you submit, and keeps each account's papers private to it.</p>
+  </section>
+</div>
+
+<!-- ================================================================ app -->
+<div class="app" id="appView" hidden>
+  <aside class="sidebar" id="sidebar" aria-label="Navigation">
+    <a class="brand" href="#/home" id="brand" aria-label="PaperMind home"><svg viewBox="0 0 32 32" aria-hidden="true">
+        <path class="trail" d="M2 27c4-1 6-3 8-6"/>
+        <g class="plane">
+          <path d="M29 3 3 14.5l9 3.2L29 3Z"/>
+          <path d="M29 3 12 17.7l1.3 9.3 4.4-6.2 6.8 3.2L29 3Z"/>
+          <path class="plane-fold" d="m12 17.7 1.3 9.3 4.4-6.2L29 3 12 17.7Z"/>
+        </g>
+      </svg><span>PaperMind</span></a>
+    <a class="btn primary block side-new" href="#/new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New analysis<kbd>N</kbd></a>
+    <nav class="nav">
+      <p class="nav-label">Workspace</p>
+      <a href="#/home" data-nav="home"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>Home</a>
+      <a href="#/library" data-nav="library"><svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 0 1 1-1h4v16H5a1 1 0 0 1-1-1z"/><path d="M9 4h4v16H9z"/><path d="m14.5 5.2 3.8-1 3.4 14.6-3.8 1z"/></svg>Library<span class="count" id="navPapers" hidden></span></a>
+      <a href="#/runs" data-nav="runs"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Runs<span class="count" id="navRuns" hidden></span></a>
+      <p class="nav-label">Explore</p>
+      <a href="#/run/demo" data-nav="demo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5 3.5-5 3.5z"/></svg>Demo run</a>
+      <a href="/docs" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M8 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3"/><path d="m10 9-2 3 2 3M14 9l2 3-2 3"/></svg>API docs<svg class="ext" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 10 14"/></svg></a>
+    </nav>
+    <div class="side-foot">
+      <nav class="nav"><a href="#/settings" data-nav="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Settings</a></nav>
+      <div class="me">
+        <span class="avatar" id="meAvatar"></span>
+        <span><b id="meName"></b><small id="meEmail"></small></span>
+        <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out"><svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg></button>
       </div>
     </div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
 
-    <div class="card launch">
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="crumb" id="crumb">Home</div>
+      <button class="jump" id="jumpBtn" aria-label="Search or jump to"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search or jump to…</span><kbd id="jumpKey">⌘K</kbd></button>
+      <div class="sys" id="sys"></div>
+      <div class="theme-wrap">
+        <button class="icon-btn" id="themeBtn" aria-haspopup="true" aria-expanded="false" aria-controls="themePop" title="Change theme (T)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.8-.5-1.2 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7.5" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg>
+        </button>
+        <div class="theme-pop" id="themePop" role="menu" hidden></div>
+      </div>
+    </header>
+    <div class="banners page-banners" id="banners"></div>
+
+    <main class="page" id="page">
+      <!-- ---------------------------------------------------------- home -->
+      <section class="view" data-view="home" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow" id="helloDate"></p>
+            <h1 class="hello" id="hello">Welcome.</h1>
+            <p class="muted" id="helloSub">Here's what your agents have been reading.</p>
+          </div>
+          <a class="btn primary" href="#/new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Analyse a paper</a>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <div class="home-grid">
+          <div class="card panel">
+            <div class="panel-head"><h2>Recent runs</h2><a class="linkish" href="#/runs">View all →</a></div>
+            <div id="homeRuns"></div>
+          </div>
+          <div class="home-side">
+            <a class="card start-card" href="#/new">
+              <span class="dz-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 17v-6"/><path d="m9 14 3-3 3 3"/></svg></span>
+              <span><b>Drop in a new paper</b><span>Upload a PDF and watch the agents read it live.</span></span>
+            </a>
+            <div class="card panel">
+              <div class="panel-head"><h2>How a run works</h2><a class="linkish" href="#/run/demo">Watch the demo →</a></div>
+              <ol class="overview-steps">
+                <li><span><b>Ingest and index.</b> The PDF becomes page-aware chunks behind a hybrid index.</span></li>
+                <li><span><b>Plan.</b> The planner picks specialists based on what the paper contains.</span></li>
+                <li><span><b>Analyse in parallel.</b> Summary, methodology, experiments and math agents cite quotes.</span></li>
+                <li><span><b>Verify and retry.</b> Claims are re-checked; weak agents re-run with feedback.</span></li>
+                <li><span><b>Report.</b> Grounded findings are written up; unsupported ones are listed openly.</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- new -->
+      <section class="view" data-view="new" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">New analysis</p>
+            <h1>Analyse a research paper</h1>
+            <p class="muted">Upload one PDF. Specialist agents read it in parallel and every claim is checked against the text.</p>
+          </div>
+        </div>
+        <div class="new-grid">
+          <div class="card launch">
       <div class="dropzone" id="drop" role="button" tabindex="0" aria-label="Choose a PDF to analyse">
         <div class="dz-orbit" aria-hidden="true"><i></i><i></i></div>
         <div class="dz-icon" aria-hidden="true">
@@ -745,16 +1244,68 @@ footer.foot a { color: var(--muted); }
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5 3.5-5 3.5z"/></svg>Watch a demo run
         </button>
       </div>
-      <div class="recent" id="recent" hidden>
-        <h3>Recent runs</h3>
-        <ul id="recentList"></ul>
-      </div>
-    </div>
-  </section>
+</div>
+          <div class="card panel">
+            <div class="panel-head"><h2>What happens next</h2></div>
+            <ol class="flow">
+              <li><span class="f-ico"><svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5z"/><path d="m3 13 9 5 9-5"/></svg></span><span><b>Read and index</b><span>Text, sections, tables and equations are extracted; scanned pages go through OCR.</span></span></li>
+              <li><span class="f-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg></span><span><b>Plan</b><span>The planner decides which specialists this paper needs.</span></span></li>
+              <li><span class="f-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3.5" width="7" height="7" rx="1.8"/><rect x="14" y="13.5" width="7" height="7" rx="1.8"/><path d="M10 7h3.5a2.5 2.5 0 0 1 2.5 2.5v4"/></svg></span><span><b>Analyse in parallel</b><span>Each agent writes findings with the exact quote behind them.</span></span></li>
+              <li><span class="f-ico"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg></span><span><b>Verify</b><span>Quotes must exist in the PDF and numbers must match, or the claim is flagged.</span></span></li>
+              <li><span class="f-ico"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></span><span><b>Report</b><span>A Markdown report with page citations, plus a list of what couldn't be grounded.</span></span></li>
+            </ol>
+            <div class="tips" id="newTips">
+              <span><b>Tip:</b> text-based PDFs give the most precise citations.</span>
+              <span>Your papers and reports are visible only to your account.</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <div class="banners" id="banners"></div>
+      <!-- ---------------------------------------------------------- library -->
+      <section class="view" data-view="library" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Library</p>
+            <h1>Your papers</h1>
+            <p class="muted" id="libSub"></p>
+          </div>
+          <a class="btn primary" href="#/new"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Upload paper</a>
+        </div>
+        <div class="toolbar">
+          <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" id="libQ" placeholder="Search titles and file names…" aria-label="Search papers"></label>
+          <select class="select" id="libSort" aria-label="Sort papers">
+            <option value="recent">Recently added</option>
+            <option value="title">Title A–Z</option>
+            <option value="grounding">Best grounded</option>
+            <option value="pages">Most pages</option>
+          </select>
+        </div>
+        <div class="papers" id="papers"></div>
+      </section>
 
-  <section class="card mission" id="mission" aria-labelledby="runTitle">
+      <!-- ---------------------------------------------------------- runs -->
+      <section class="view" data-view="runs" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Runs</p>
+            <h1>Analysis history</h1>
+            <p class="muted" id="runsSub"></p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="seg" id="runsFilter" role="group" aria-label="Filter runs">
+            <button data-f="all">All</button><button data-f="active">Running</button><button data-f="completed">Completed</button><button data-f="failed">Failed</button>
+          </div>
+          <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" id="runsQ" placeholder="Search by paper or run id…" aria-label="Search runs"></label>
+        </div>
+        <div class="card runs-card" id="runsCard"></div>
+      </section>
+
+      <!-- ---------------------------------------------------------- run -->
+      <section class="view" data-view="run" hidden>
+        <div class="run-crumbs"><a class="linkish" href="#/runs">← All runs</a><span class="muted small" id="runId"></span></div>
+        <section class="card mission" id="mission" aria-labelledby="runTitle">
     <div class="mission-head">
       <div>
         <p class="eyebrow" id="runKind">Mission control</p>
@@ -795,8 +1346,7 @@ footer.foot a { color: var(--muted); }
     </div>
     </div>
   </section>
-
-  <section class="results" id="results" hidden aria-labelledby="resTitle">
+        <section class="results" id="results" hidden aria-labelledby="resTitle">
     <div class="section-title">
       <div>
         <p class="eyebrow">Results</p>
@@ -865,11 +1415,56 @@ footer.foot a { color: var(--muted); }
       </div>
     </div>
   </section>
+      </section>
 
-  <footer class="foot">
-    PaperMind verifies claims only against the PDF you submit. <a href="/docs">API docs</a>
-  </footer>
-</main>
+      <!-- ---------------------------------------------------------- settings -->
+      <section class="view" data-view="settings" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Settings</p>
+            <h1>Account and appearance</h1>
+          </div>
+        </div>
+        <div class="settings">
+          <div class="card panel profile">
+            <span class="avatar xl" id="profAvatar"></span>
+            <div><h2 id="profName"></h2><p id="profEmail"></p></div>
+            <dl>
+              <div><dt>Member since</dt><dd id="profSince">—</dd></div>
+              <div><dt>Papers analysed</dt><dd id="profPapers">—</dd></div>
+            </dl>
+            <div class="actions">
+              <button class="btn danger sm" id="signOutBtn2"><svg viewBox="0 0 24 24"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg>Sign out</button>
+            </div>
+          </div>
+          <div class="card panel">
+            <div class="panel-head"><h2>Change password</h2></div>
+            <form id="pwForm" novalidate>
+              <label class="field"><span>Current password</span><div class="input"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><input name="current" type="password" autocomplete="current-password" required></div></label>
+              <label class="field"><span>New password</span><div class="input"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><input name="next" type="password" autocomplete="new-password" required></div></label>
+              <p class="form-error" id="pwError" role="alert" hidden></p>
+              <button class="btn primary" type="submit" id="pwSubmit">Update password</button>
+              <p class="muted small" style="margin:0">Changing it signs out your other devices.</p>
+            </form>
+          </div>
+          <div class="card panel span2">
+            <div class="panel-head"><h2>Appearance</h2><span class="muted small">Press <kbd>T</kbd> anywhere to cycle themes</span></div>
+            <div class="theme-grid" id="themeGrid"></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">PaperMind verifies claims only against the PDF you submit. <a href="/docs" target="_blank" rel="noopener">API docs</a></footer>
+    </main>
+  </div>
+</div>
+
+<div class="palette" id="palette" hidden role="dialog" aria-modal="true" aria-label="Search or jump to">
+  <div class="card palette-box">
+    <label class="palette-input"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="palQ" placeholder="Search papers and runs, or jump to a page…" autocomplete="off" aria-controls="palList"><kbd>Esc</kbd></label>
+    <ul class="palette-list" id="palList" role="listbox"></ul>
+  </div>
+</div>
 
 <div class="toasts" id="toasts" aria-live="assertive"></div>
 
@@ -909,8 +1504,20 @@ async function apiError(res) {
     return new Error(body.message || body.detail?.message || (typeof body.detail === "string" ? body.detail : "") || res.statusText);
   } catch { return new Error(text || res.statusText || `HTTP ${res.status}`); }
 }
+/* Every API call rides on the session cookie. A 401 means the session ended
+   (signed out elsewhere, expired, password changed): go back to sign-in. */
+let sessionLost = false;
+async function api(url, opts = {}) {
+  const res = await fetch(url, opts);
+  if (res.status === 401 && me && !sessionLost && !url.startsWith("/auth/")) {
+    sessionLost = true;
+    toast("Your session has ended. Please sign in again.", "warn");
+    setTimeout(() => location.reload(), 1400);
+  }
+  return res;
+}
 async function jget(url) {
-  const res = await fetch(url);
+  const res = await api(url);
   if (!res.ok) throw await apiError(res);
   return res.json();
 }
@@ -950,13 +1557,22 @@ if (!THEMES.some((t) => t.id === themeChoice)) themeChoice = "system";
 const resolveTheme = (id) => id === "system" ? (darkMQ.matches ? "midnight" : "paper") : id;
 
 function renderThemeMenu() {
-  $("#themePop").innerHTML = `<h3>Theme <kbd>T</kbd></h3>` + THEMES.map((t) => `
-    <button class="theme-opt" role="menuitemradio" aria-checked="${t.id === themeChoice}" data-theme-id="${t.id}">
+  const options = (role) => THEMES.map((t) => `
+    <button class="theme-opt" role="${role}" aria-checked="${t.id === themeChoice}" data-theme-id="${t.id}">
       <span class="theme-prev" style="background:${t.bg}">
         <span style="background:${t.sw[0]}"></span><i style="background:${t.sw[1]}"></i><em style="background:${t.sw[2]}"></em>
       </span>
       <b>${t.name}</b><small>${t.sub}</small>
     </button>`).join("");
+  $("#themePop").innerHTML = `<h3>Theme <kbd>T</kbd></h3>` + options("menuitemradio");
+  $("#themeGrid").innerHTML = options("radio");
+}
+function cycleTheme(back = false) {
+  const ids = THEMES.map((t) => t.id).filter((id) => id !== "system");
+  const current = ids.indexOf(resolveTheme(themeChoice));
+  const next = ids[(current + (back ? ids.length - 1 : 1)) % ids.length];
+  setTheme(next);
+  toast(`Theme: ${THEMES.find((t) => t.id === next).name}`);
 }
 function setTheme(id, origin) {
   const apply = () => {
@@ -983,10 +1599,12 @@ function toggleThemeMenu(open) {
   if (next) pop.querySelector('[aria-checked="true"]')?.focus();
 }
 $("#themeBtn").addEventListener("click", (e) => { e.stopPropagation(); toggleThemeMenu(); });
-$("#themePop").addEventListener("click", (e) => {
-  const opt = e.target.closest("[data-theme-id]");
-  if (opt) setTheme(opt.dataset.themeId, opt);
-});
+for (const host of ["#themePop", "#themeGrid"]) {
+  $(host).addEventListener("click", (e) => {
+    const opt = e.target.closest("[data-theme-id]");
+    if (opt) setTheme(opt.dataset.themeId, opt);
+  });
+}
 document.addEventListener("click", (e) => {
   if (!$("#themePop").hidden && !e.target.closest(".theme-wrap")) toggleThemeMenu(false);
 });
@@ -994,13 +1612,7 @@ darkMQ.addEventListener("change", () => { if (themeChoice === "system") setTheme
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !$("#themePop").hidden) { toggleThemeMenu(false); $("#themeBtn").focus(); return; }
   if (e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === "t" || e.key === "T") {
-    const ids = THEMES.map((t) => t.id).filter((id) => id !== "system");
-    const current = ids.indexOf(resolveTheme(themeChoice));
-    const next = ids[(current + (e.shiftKey ? ids.length - 1 : 1)) % ids.length];
-    setTheme(next);
-    toast(`Theme: ${THEMES.find((t) => t.id === next).name}`);
-  }
+  if (e.key === "t" || e.key === "T") cycleTheme(e.shiftKey);
 });
 renderThemeMenu();
 
@@ -1566,6 +2178,7 @@ function newRun(kind, title) {
   showRunAlert();
   $("#runTitle").textContent = title;
   $("#runKind").textContent = kind === "demo" ? "Demo run · simulated events" : kind === "replay" ? "Saved run · replay" : "Live run";
+  setCrumb();
   setRunStatus("running", "Starting");
   $$("#graph .edge").forEach((el) => { el.dataset.state = ""; });
   paintGraph();
@@ -1641,10 +2254,10 @@ async function finish(token) {
   } else {
     const [f, r] = await Promise.allSettled([
       jget(`/analyses/${run.id}/findings`),
-      fetch(`/analyses/${run.id}/report`).then(async (res) => { if (!res.ok) throw await apiError(res); return res.text(); }),
+      api(`/analyses/${run.id}/report`).then(async (res) => { if (!res.ok) throw await apiError(res); return res.text(); }),
       jget(`/papers/${data.document_id}`).then((doc) => {
         const name = doc.title || doc.filename;
-        if (name && run.token === token) { run.title = name; $("#runTitle").textContent = name; rememberRun(run.id, name, data.status); }
+        if (name && run.token === token) { run.title = name; $("#runTitle").textContent = name; setCrumb(); }
       }),
     ]);
     if (f.status === "fulfilled") findings = f.value.findings || [];
@@ -1665,6 +2278,14 @@ let pendingFile = null, uploading = false;
 function syncLaunch() {
   $("#go").disabled = !pendingFile || uploading;
 }
+function resetDrop() {
+  pendingFile = null;
+  $("#file").value = "";
+  $("#drop").classList.remove("has-file");
+  $("#dzTitle").textContent = "Drop a research PDF here";
+  $("#dzSub").textContent = "or click to browse your files";
+  syncLaunch();
+}
 function pickFile(file) {
   if (!file) return;
   const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
@@ -1684,33 +2305,31 @@ $("#file").addEventListener("change", (e) => pickFile(e.target.files[0]));
 ["dragleave", "dragend"].forEach((t) => drop.addEventListener(t, () => drop.classList.remove("drag")));
 drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("drag"); pickFile(e.dataTransfer.files[0]); });
 window.addEventListener("dragover", (e) => e.preventDefault());
-window.addEventListener("drop", (e) => { if (!e.target.closest("#drop")) { e.preventDefault(); pickFile(e.dataTransfer.files[0]); } });
+window.addEventListener("drop", (e) => {
+  if (e.target.closest("#drop")) return;
+  e.preventDefault();
+  if (!me || !e.dataTransfer.files[0]) return;
+  if (view !== "new") location.hash = "#/new";
+  pickFile(e.dataTransfer.files[0]);
+});
 
 async function launch() {
   const file = pendingFile;
   if (!file) return;
   const token = newRun("live", file.name);
+  location.hash = "#/run/live";
   uploading = true; syncLaunch();
   applyEvent({ stage: "upload", status: "started", message: `Uploading ${file.name} (${fmtBytes(file.size)})`, at: new Date().toISOString(), local: true, detail: {} });
   try {
     const form = new FormData();
     form.append("file", file);
-    const up = await fetch("/papers", { method: "POST", body: form });
+    const up = await api("/papers", { method: "POST", body: form });
     if (!up.ok) throw await apiError(up);
     const { document_id } = await up.json();
     if (run.token !== token) return;
     applyEvent({ stage: "upload", status: "completed", message: `Stored as ${document_id}`, at: new Date().toISOString(), local: true, detail: { document: document_id } });
-
-    const start = await fetch(`/papers/${document_id}/analyze`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wait: false }),
-    });
-    if (!start.ok) throw await apiError(start);
-    const started = await start.json();
-    if (run.token !== token) return;
-    run.id = started.analysis_id;
-    rememberRun(run.id, file.name, "running");
-    history.replaceState(null, "", `#${run.id}`);
-    poll(token);
+    resetDrop();
+    await startAnalysis(document_id, token);
   } catch (err) {
     failRun(token, err.message);
   } finally {
@@ -1722,7 +2341,8 @@ $("#go").addEventListener("click", launch);
 async function openAnalysis(id, name) {
   const token = newRun("replay", name || id);
   run.id = id;
-  history.replaceState(null, "", `#${id}`);
+  history.replaceState(null, "", `#/run/${id}`);
+  setCrumb();
   try {
     const data = await jget(`/analyses/${id}`);
     if (run.token !== token) return;
@@ -1742,28 +2362,6 @@ async function openAnalysis(id, name) {
 $("#replay").addEventListener("click", () => {
   if (run.kind === "demo" || !run.id) startDemo();
   else openAnalysis(run.id, run.title);
-});
-
-/* ---------- recent runs ---------- */
-function rememberRun(id, name, status) {
-  if (!id) return;
-  const list = store.get("pp-recent", []).filter((r) => r.id !== id);
-  list.unshift({ id, name: name || id, status, at: Date.now() });
-  store.set("pp-recent", list.slice(0, 6));
-  renderRecent();
-}
-function renderRecent() {
-  const list = store.get("pp-recent", []);
-  $("#recent").hidden = !list.length;
-  $("#recentList").innerHTML = list.map((r) => {
-    const c = r.status === "completed" ? "var(--ok)" : r.status === "failed" ? "var(--bad)" : "var(--accent)";
-    return `<li><button data-open="${esc(r.id)}" data-name="${esc(r.name)}" title="${esc(r.id)}">
-      <span class="dot" style="--c:${c}"></span><span class="name">${esc(r.name)}</span><time>${relTime(r.at)}</time></button></li>`;
-  }).join("");
-}
-$("#recentList").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-open]");
-  if (b) openAnalysis(b.dataset.open, b.dataset.name);
 });
 
 /* ---------- speed ---------- */
@@ -2071,7 +2669,7 @@ $("#toc").addEventListener("click", (e) => {
 });
 
 /* ================================================================ health */
-(async function health() {
+async function health() {
   try {
     const h = await jget("/health");
     const chips = [
@@ -2095,7 +2693,7 @@ $("#toc").addEventListener("click", (e) => {
   } catch {
     $("#sys").innerHTML = `<span class="chip"><span class="dot" style="--c:var(--bad)"></span>API <b>offline</b></span>`;
   }
-})();
+}
 $("#banners").addEventListener("click", (e) => {
   const b = e.target.closest("[data-dismiss]");
   if (!b) return;
@@ -2105,7 +2703,6 @@ $("#banners").addEventListener("click", (e) => {
   store.set("pp-dismissed", [...store.get("pp-dismissed", []), ...items]);
   b.closest(".banner").remove();
 });
-$("#brand").addEventListener("click", (e) => { e.preventDefault(); scrollTo({ top: 0, behavior: reduceMotion.matches ? "auto" : "smooth" }); });
 
 /* ================================================================ demo */
 const DEMO_RATIONALE = {
@@ -2241,7 +2838,7 @@ Longformer and BigBird impose fixed local and global attention patterns *(p. 1, 
 };
 function startDemo() {
   const token = newRun("demo", "Sparse Routing Transformers");
-  history.replaceState(null, "", location.pathname);
+  history.replaceState(null, "", "#/run/demo");
   const base = Date.now();
   const events = DEMO_SCRIPT.map(([t, stage, status, message, detail]) =>
     ({ stage, status, message, detail, at: new Date(base + t * 1000).toISOString() }));
@@ -2250,14 +2847,628 @@ function startDemo() {
   run.backendDone = true;
   enqueue(events, token);
 }
-$("#demo").addEventListener("click", startDemo);
+$("#demo").addEventListener("click", () => { location.hash = "#/run/demo"; if (run.kind === "demo") startDemo(); });
+
+/* ================================================================ accounts */
+let me = null;
+const AUTH = { mode: "login", inviteRequired: false, minLen: 8 };
+const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+const firstName = (n) => String(n || "").trim().split(/\s+/)[0] || "there";
+const initials = (n) => (String(n || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("") || "?").toUpperCase();
+const sentence = (s) => { const t = String(s || "").trim(); return t ? t[0].toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".") : ""; };
+function hashHue(s) { let h = 7; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+function coverFor(seed) {
+  const h = hashHue(seed) % 360;
+  return `linear-gradient(135deg, hsl(${h} 58% 44%), hsl(${(h + 52) % 360} 66% 34%))`;
+}
+const monogram = (s) => esc((String(s || "?").replace(/[^\p{L}\p{N}]/gu, "")[0] || "?").toUpperCase());
+
+function hideBoot() {
+  const boot = $("#boot");
+  if (!boot) return;
+  boot.classList.add("out");
+  setTimeout(() => boot.remove(), 400);
+}
+
+/* ---------- sign in / create account ---------- */
+function authError(message, field) {
+  $$("#authForm .input").forEach((i) => i.classList.remove("invalid"));
+  const box = $("#authError");
+  box.hidden = !message;
+  box.textContent = message || "";
+  if (field) {
+    const input = $(`#authForm [name=${field}]`);
+    input?.closest(".input").classList.add("invalid");
+    input?.focus();
+  }
+}
+function setAuthMode(mode) {
+  AUTH.mode = mode;
+  const signup = mode === "signup";
+  $$("#authForm [data-only=signup]").forEach((el) => { el.hidden = !signup; });
+  $("#inviteField").hidden = !(signup && AUTH.inviteRequired);
+  $$(".auth-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+  $("#authTitle").textContent = signup ? "Create your account" : "Welcome back";
+  $("#authSub").textContent = signup
+    ? (AUTH.inviteRequired ? "You'll need the invite code from whoever runs this server." : "Start a private library of grounded paper analyses.")
+    : "Sign in to your library of analysed papers.";
+  $("#authSubmitText").textContent = signup ? "Create account" : "Sign in";
+  const pw = $("#authForm [name=password]");
+  pw.autocomplete = signup ? "new-password" : "current-password";
+  pw.placeholder = signup ? `At least ${AUTH.minLen} characters` : "••••••••";
+  $("#authSwitch").innerHTML = signup
+    ? `Already have an account? <button type="button" class="linkish" data-mode="login">Sign in</button>`
+    : `New to PaperMind? <button type="button" class="linkish" data-mode="signup">Create an account</button>`;
+  authError();
+}
+function updateStrength() {
+  const p = $("#authForm [name=password]").value;
+  const longEnough = p.length >= AUTH.minLen;
+  let score = longEnough ? 1 : 0;
+  if (p.length >= 12) score++;
+  if (/[a-z]/.test(p) && /[A-Z]/.test(p)) score++;
+  if (/\d/.test(p) || /[^\w\s]/.test(p)) score++;
+  if (!longEnough) score = p ? 1 : 0;
+  $("#strength").dataset.score = String(score);
+  $("#strengthText").textContent = !p ? "" : !longEnough ? "Too short" : ["", "Weak", "Fair", "Good", "Strong"][score];
+}
+$(".auth-card").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mode]");
+  if (b) { setAuthMode(b.dataset.mode); $(`#authForm [name=${b.dataset.mode === "signup" ? "name" : "email"}]`).focus(); }
+});
+$("#authForm [name=password]").addEventListener("input", updateStrength);
+$("#authForm .peek").addEventListener("click", (e) => {
+  const btn = e.currentTarget, input = btn.parentNode.querySelector("input");
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  btn.setAttribute("aria-pressed", String(show));
+  btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+});
+$("#authForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target), signup = AUTH.mode === "signup";
+  const body = { email: String(form.get("email") || "").trim(), password: String(form.get("password") || "") };
+  if (signup) {
+    body.name = String(form.get("name") || "").trim();
+    body.invite_code = String(form.get("invite_code") || "").trim() || null;
+    if (!body.name) return authError("Please enter your name.", "name");
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.email)) return authError("Please enter a valid email address.", "email");
+  if (!body.password) return authError("Please enter your password.", "password");
+  if (signup && body.password.length < AUTH.minLen) return authError(`The password must be at least ${AUTH.minLen} characters.`, "password");
+  if (signup && AUTH.inviteRequired && !body.invite_code) return authError("Please enter the invite code.", "invite_code");
+
+  const submit = $("#authSubmit");
+  submit.disabled = true;
+  submit.insertAdjacentHTML("afterbegin", `<span class="spin" aria-hidden="true"></span>`);
+  try {
+    const res = await fetch(signup ? "/auth/signup" : "/auth/login", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await apiError(res);
+      const field = res.status === 403 ? "invite_code" : res.status === 409 ? "email" : res.status === 401 ? "password" : null;
+      authError(sentence(err.message), field);
+      return;
+    }
+    const { user } = await res.json();
+    e.target.reset();
+    updateStrength();
+    enterApp(user, signup);
+  } catch {
+    authError("Couldn't reach the server. Is it still running?");
+  } finally {
+    submit.disabled = false;
+    submit.querySelector(".spin")?.remove();
+  }
+});
+
+/* The proof card: what grounding looks like, on a loop. Constants, not user data. */
+const PROOFS = [
+  { agent: "Experiments agent", claim: "Removing the load-balancing loss reduces NarrativeQA F1 from 81.4 to 78.8.",
+    quote: "Removing the load-balancing loss reduces NarrativeQA F1 from <mark>81.4 to 78.8</mark> and causes routed mass to collapse onto two blocks.",
+    cite: "p. 5 · §4.3 Ablations", verdict: "supported", label: "Supported", quality: "exact match" },
+  { agent: "Summary agent", claim: "The method reaches 99.9% accuracy on ImageNet.",
+    quote: "No passage in the paper mentions ImageNet, and the figure 99.9% appears nowhere in its text.",
+    cite: "searched all 6 pages", verdict: "unsupported", label: "Unsupported", quality: "flagged, not hidden" },
+  { agent: "Methodology agent", claim: "A learned router sends only a few document blocks to full attention.",
+    quote: "a discrete router that <mark>selects a small subset of document blocks for full attention</mark> while the remainder receive a cheap pooled representation",
+    cite: "p. 2 · §3 Method", verdict: "supported", label: "Supported", quality: "normalized match" },
+];
+let proofTimer = null, proofVerdictTimer = null, proofIndex = 0;
+function proofStep() {
+  const p = PROOFS[proofIndex++ % PROOFS.length], verdict = $("#proofVerdict");
+  $("#proofAgent").textContent = p.agent;
+  $("#proofClaim").textContent = p.claim;
+  $("#proofQuote").innerHTML = p.quote;
+  $("#proofCite").textContent = p.cite;
+  $("#proofQuality").textContent = "";
+  verdict.dataset.s = "checking";
+  verdict.querySelector("b").textContent = "Checking quote…";
+  $("#proof").classList.add("scanning");
+  clearTimeout(proofVerdictTimer);
+  proofVerdictTimer = setTimeout(() => {
+    $("#proof").classList.remove("scanning");
+    verdict.dataset.s = p.verdict;
+    verdict.querySelector("b").textContent = p.label;
+    $("#proofQuality").textContent = p.quality;
+  }, reduceMotion.matches ? 0 : 1700);
+}
+function startProof() { stopProof(); proofStep(); proofTimer = setInterval(proofStep, 4600); }
+function stopProof() { clearInterval(proofTimer); clearTimeout(proofVerdictTimer); proofTimer = null; }
+
+async function showAuth() {
+  me = null;
+  $("#appView").hidden = true;
+  $("#authView").hidden = false;
+  document.title = "Sign in · PaperMind";
+  try {
+    const config = await (await fetch("/auth/config")).json();
+    AUTH.inviteRequired = Boolean(config.invite_required);
+    AUTH.minLen = config.min_password_length || AUTH.minLen;
+  } catch { /* the form still works; the server re-checks everything */ }
+  setAuthMode(AUTH.mode);
+  hideBoot();
+  startProof();
+  $("#authForm [name=email]").focus();
+}
+
+function enterApp(user, isNew = false) {
+  me = user;
+  stopProof();
+  $("#authView").hidden = true;
+  $("#appView").hidden = false;
+  hideBoot();
+  paintMe();
+  health();
+  refreshData();
+  if (!/^#\//.test(location.hash) && !/^#analysis-/.test(location.hash)) history.replaceState(null, "", "#/home");
+  route();
+  if (isNew) toast(`Welcome to PaperMind, ${firstName(user.name)}.`, "ok");
+}
+function paintMe() {
+  for (const id of ["#meAvatar", "#profAvatar"]) $(id).textContent = initials(me.name);
+  $("#meName").textContent = me.name;
+  $("#meEmail").textContent = me.email;
+  $("#profName").textContent = me.name;
+  $("#profEmail").textContent = me.email;
+  $("#profSince").textContent = new Date(me.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
+async function signOut() {
+  try { await fetch("/auth/logout", { method: "POST" }); } catch { /* signing out locally anyway */ }
+  location.replace(location.pathname);
+}
+$("#signOutBtn").addEventListener("click", signOut);
+$("#signOutBtn2").addEventListener("click", signOut);
+
+$("#pwForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target), box = $("#pwError");
+  const current = String(form.get("current") || ""), next = String(form.get("next") || "");
+  const fail = (m) => { box.textContent = m; box.hidden = false; };
+  box.hidden = true;
+  if (!current) return fail("Please enter your current password.");
+  if (next.length < AUTH.minLen) return fail(`The new password must be at least ${AUTH.minLen} characters.`);
+  $("#pwSubmit").disabled = true;
+  try {
+    // Plain fetch: a wrong current password is a 401 that must not end the session.
+    const res = await fetch("/auth/password", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password: current, new_password: next }),
+    });
+    if (!res.ok) throw await apiError(res);
+    e.target.reset();
+    toast("Password updated. Your other devices were signed out.", "ok");
+  } catch (err) {
+    fail(sentence(err.message));
+  } finally {
+    $("#pwSubmit").disabled = false;
+  }
+});
+
+/* ================================================================ data */
+const cache = { papers: [], runs: [], at: 0, loaded: false, pending: null };
+const ACTIVE = (status) => status !== "completed" && status !== "failed";
+const LISTED_VIEWS = new Set(["home", "library", "runs", "settings"]);
+function refreshData() {
+  if (!me) return Promise.resolve();
+  if (cache.pending) return cache.pending;
+  cache.pending = Promise.all([jget("/papers?limit=500"), jget("/analyses?limit=200")])
+    .then(([papers, runs]) => {
+      Object.assign(cache, { papers, runs, at: Date.now(), loaded: true });
+      renderNav();
+      if (LISTED_VIEWS.has(view)) paintView();
+      if (!$("#palette").hidden) renderPalette();
+    })
+    .catch((err) => { if (me) toast(`Couldn't load your library: ${err.message}`, "warn"); })
+    .finally(() => { cache.pending = null; });
+  return cache.pending;
+}
+/* Refresh lists while something is running, so progress moves without a reload. */
+setInterval(() => {
+  if (me && document.visibilityState === "visible" && LISTED_VIEWS.has(view) && cache.runs.some((r) => ACTIVE(r.status))) refreshData();
+}, 5000);
+function rememberRun() { refreshData(); }
+
+const pct = (x) => (x == null ? "—" : `${Math.round(x * 100)}%`);
+const ago = (iso) => (iso ? relTime(Date.parse(iso)) : "—");
+const paperTitle = (p) => p.title || (p.filename || "").replace(/\.pdf$/i, "").replace(/[_-]+/g, " ") || p.document_id;
+const runName = (r) => r.title || r.document_id;
+function fmtDuration(s) {
+  if (s == null) return "—";
+  if (s < 60) return `${s.toFixed(s < 10 ? 1 : 0)}s`;
+  return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
+}
+const fmtCost = (c) => (c == null ? "—" : c < 0.01 ? "<$0.01" : `$${c.toFixed(2)}`);
+const fmtTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n || 0));
+function runPill(status) {
+  if (status === "completed") return `<span class="pill ok"><i></i>Completed</span>`;
+  if (status === "failed") return `<span class="pill bad"><i></i>Failed</span>`;
+  if (status === "pending") return `<span class="pill wait"><i></i>Queued</span>`;
+  return `<span class="pill run"><i></i>${esc(titleCase(status))}</span>`;
+}
+const meter = (rate) => rate == null
+  ? `<span class="muted">—</span>`
+  : `<span class="meter"><span class="track"><i style="width:${Math.round(rate * 100)}%"></i></span>${pct(rate)}</span>`;
+function emptyState(icon, title, text, action = "") {
+  return `<div class="empty-state"><span class="es-icon"><svg viewBox="0 0 24 24">${icon}</svg></span>
+    <h3>${title}</h3><p>${text}</p>${action}</div>`;
+}
+const skeletonRows = (n, h = 48) => Array.from({ length: n }, () => `<div class="skeleton" style="height:${h}px;margin:8px 0"></div>`).join("");
+/* Re-render a region only when its content changed, so polling doesn't restart animations. */
+function paint(el, html, after) {
+  if (el.dataset.sig === html) return;
+  el.dataset.sig = html;
+  el.innerHTML = html;
+  after?.();
+}
+
+/* ---------- nav ---------- */
+function renderNav() {
+  const active = cache.runs.filter((r) => ACTIVE(r.status)).length;
+  const papers = $("#navPapers"), runs = $("#navRuns");
+  papers.hidden = !cache.papers.length;
+  papers.textContent = cache.papers.length;
+  runs.hidden = !cache.runs.length;
+  runs.textContent = active || cache.runs.length;
+  runs.classList.toggle("live", active > 0);
+  runs.title = active ? `${active} running now` : `${cache.runs.length} runs`;
+}
+
+/* ---------- home ---------- */
+function runRow(r, i) {
+  return `<a class="runrow" href="#/run/${encodeURIComponent(r.analysis_id)}" style="--i:${i}">
+    <span class="doc-ico" style="--cover:${coverFor(r.document_id)}">${monogram(runName(r))}</span>
+    <span class="rr-main"><b>${esc(runName(r))}</b><small><span>${ago(r.created_at)}</span>
+      ${r.findings ? `<span>${r.findings} findings</span>` : ""}${r.grounded_rate != null ? `<span>${pct(r.grounded_rate)} grounded</span>` : ""}</small></span>
+    <span class="rr-side">${runPill(r.status)}<small>${ACTIVE(r.status) ? pct(r.progress) : fmtDuration(r.duration_seconds)}</small></span>
+  </a>`;
+}
+const ICON_SVG = {
+  papers: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+  runs: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  tokens: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9a2.5 2.5 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.7 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2A2.6 2.6 0 0 1 9.5 15M12 6v1.5M12 16.5V18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>',
+  library: '<path d="M4 5a1 1 0 0 1 1-1h4v16H5a1 1 0 0 1-1-1z"/><path d="M9 4h4v16H9z"/><path d="m14.5 5.2 3.8-1 3.4 14.6-3.8 1z"/>',
+  play: '<circle cx="12" cy="12" r="9"/><path d="m10 8.5 5 3.5-5 3.5z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-1-.8-1.4-.8-2.4 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/>',
+  out: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/>',
+};
+function renderHome() {
+  const now = new Date(), hour = now.getHours();
+  const part = hour < 5 ? "Working late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  $("#helloDate").textContent = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  $("#hello").innerHTML = `${part}, <em>${esc(firstName(me.name))}</em>.`;
+  const runs = cache.runs, active = runs.filter((r) => ACTIVE(r.status));
+  const rates = runs.filter((r) => r.status === "completed" && r.grounded_rate != null).map((r) => r.grounded_rate);
+  const avg = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null;
+  const tokens = runs.reduce((a, r) => a + (r.total_tokens || 0), 0);
+  const costs = runs.map((r) => r.estimated_cost_usd).filter((c) => c != null);
+  const cost = costs.length ? costs.reduce((a, b) => a + b, 0) : null;
+  $("#helloSub").textContent = !cache.loaded ? "Loading your library…"
+    : active.length ? `${active.length} ${active.length > 1 ? "analyses are" : "analysis is"} running right now.`
+    : runs.length ? "Here's what your agents have been reading." : "Upload your first paper to get started.";
+
+  const ring = (x) => `<svg class="ring" viewBox="0 0 52 52" aria-hidden="true"><circle class="r-track" cx="26" cy="26" r="21"/>
+    <circle class="r-fill" cx="26" cy="26" r="21" transform="rotate(-90 26 26)" stroke-dasharray="131.95" stroke-dashoffset="131.95" data-off="${131.95 * (1 - (x || 0))}"/></svg>`;
+  const kpis = [
+    ["Papers", cache.papers.length, `${cache.papers.filter((p) => p.page_count).reduce((a, p) => a + p.page_count, 0)} pages read`, ICON_SVG.papers],
+    ["Analyses", runs.length, active.length ? `${active.length} running now` : `${runs.filter((r) => r.status === "failed").length} failed`, ICON_SVG.runs],
+    ["Avg. grounding", avg == null ? null : Math.round(avg * 100), "findings backed by a quote", null, avg],
+    ["Tokens used", tokens, cost == null ? "cost not reported" : `≈ ${fmtCost(cost)} estimated`, ICON_SVG.tokens],
+  ];
+  paint($("#kpis"), kpis.map(([label, , sub, icon, r], i) => `<div class="card kpi" style="--i:${i}">
+      <span class="k-label">${label}</span><strong>—</strong><small>${esc(sub)}</small>
+      ${icon ? `<span class="k-icon"><svg viewBox="0 0 24 24">${icon}</svg></span>` : ring(r)}</div>`).join("") + `<!--${cache.loaded}-->`,
+  () => {
+    $$("#kpis .kpi strong").forEach((el, i) => {
+      const v = kpis[i][1];
+      if (i === 3) { el.textContent = fmtTokens(v); return; }
+      countUp(el, cache.loaded ? v : null, i === 2 ? { suffix: "%" } : {});
+    });
+    requestAnimationFrame(() => requestAnimationFrame(() => $$("#kpis .r-fill").forEach((c) => { c.style.strokeDashoffset = c.dataset.off; })));
+  });
+
+  paint($("#homeRuns"), !cache.loaded ? skeletonRows(4)
+    : runs.length ? `<div class="runlist">${runs.slice(0, 7).map(runRow).join("")}</div>`
+    : emptyState(ICON_SVG.runs, "No runs yet", "Your analyses will show up here, with live progress while they run.",
+        `<a class="btn primary sm" href="#/new">Analyse your first paper</a>`));
+}
+
+/* ---------- library ---------- */
+const lib = { q: "", sort: "recent" };
+function renderLibrary() {
+  const latest = {}, lastDone = {}, count = {};
+  for (const r of cache.runs) {   // newest first
+    count[r.document_id] = (count[r.document_id] || 0) + 1;
+    latest[r.document_id] ??= r;
+    if (r.status === "completed") lastDone[r.document_id] ??= r;
+  }
+  const q = lib.q.trim().toLowerCase();
+  const papers = cache.papers
+    .filter((p) => !q || [p.title, p.filename, p.document_id].some((s) => String(s || "").toLowerCase().includes(q)))
+    .sort((a, b) => lib.sort === "title" ? paperTitle(a).localeCompare(paperTitle(b))
+      : lib.sort === "pages" ? (b.page_count || 0) - (a.page_count || 0)
+      : lib.sort === "grounding" ? (lastDone[b.document_id]?.grounded_rate ?? -1) - (lastDone[a.document_id]?.grounded_rate ?? -1)
+      : Date.parse(b.ingested_at) - Date.parse(a.ingested_at));
+  $("#libSub").textContent = cache.loaded
+    ? `${cache.papers.length} paper${cache.papers.length === 1 ? "" : "s"} · ${cache.runs.length} analys${cache.runs.length === 1 ? "is" : "es"}` : "Loading…";
+  if (!cache.loaded) { paint($("#papers"), skeletonRows(2, 220)); return; }
+  if (!cache.papers.length) {
+    paint($("#papers"), emptyState(ICON_SVG.library, "Your library is empty", "Upload a research PDF and it will live here, with every analysis you run on it.",
+      `<a class="btn primary sm" href="#/new">Upload a paper</a>`));
+    return;
+  }
+  if (!papers.length) { paint($("#papers"), `<div class="empty" style="grid-column:1/-1">No papers match “${esc(lib.q)}”.</div>`); return; }
+  paint($("#papers"), papers.map((p, i) => {
+    const id = p.document_id, title = paperTitle(p), last = latest[id], done = lastDone[id];
+    const action = last && ACTIVE(last.status)
+      ? `<a class="btn primary sm" href="#/run/${encodeURIComponent(last.analysis_id)}">Watch live</a>`
+      : `<button class="btn ghost sm" data-rerun="${esc(id)}" data-title="${esc(title)}">${last ? "Re-run" : "Analyse"}</button>`;
+    return `<article class="card paper" style="--i:${i}">
+      <div class="cover" style="--cover:${coverFor(id)}">
+        <span class="mono" aria-hidden="true">${monogram(title)}</span>
+        <span class="c-top"><span>${p.page_count ? `${p.page_count} pages` : "Not parsed yet"}</span><span>${fmtBytes(p.file_size_bytes || 0)}</span></span>
+        <span class="c-title">${esc(title)}</span>
+      </div>
+      <div class="paper-body">
+        <span class="paper-file" title="${esc(p.filename || id)}">${esc(p.filename || id)}</span>
+        <span class="paper-meta"><span>Added ${ago(p.ingested_at)}</span><span>${count[id] || 0} run${count[id] === 1 ? "" : "s"}</span>
+          ${p.element_counts?.table ? `<span>${p.element_counts.table} tables</span>` : ""}${p.element_counts?.equation ? `<span>${p.element_counts.equation} equations</span>` : ""}</span>
+        <div class="paper-status">${last ? runPill(last.status) : `<span class="pill wait"><i></i>Not analysed</span>`}${done ? meter(done.grounded_rate) : "<span></span>"}</div>
+        <div class="paper-foot">${done ? `<a class="btn primary sm" href="#/run/${encodeURIComponent(done.analysis_id)}">Open report</a>` : ""}${action}</div>
+      </div>
+    </article>`;
+  }).join(""));
+}
+$("#libQ").addEventListener("input", (e) => { lib.q = e.target.value; renderLibrary(); });
+$("#libSort").addEventListener("change", (e) => { lib.sort = e.target.value; renderLibrary(); });
+$("#papers").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-rerun]");
+  if (b) analyseExisting(b.dataset.rerun, b.dataset.title);
+});
+
+/* ---------- runs ---------- */
+const runsUI = { f: "all", q: "" };
+function renderRuns() {
+  const all = cache.runs, q = runsUI.q.trim().toLowerCase();
+  const active = all.filter((r) => ACTIVE(r.status)).length, failed = all.filter((r) => r.status === "failed").length;
+  $("#runsSub").textContent = cache.loaded ? `${all.length} run${all.length === 1 ? "" : "s"} · ${active} running · ${failed} failed` : "Loading…";
+  $$("#runsFilter button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.f === runsUI.f)));
+  const list = all
+    .filter((r) => runsUI.f === "all" || (runsUI.f === "active" ? ACTIVE(r.status) : r.status === runsUI.f))
+    .filter((r) => !q || [r.title, r.analysis_id, r.document_id].some((s) => String(s || "").toLowerCase().includes(q)));
+  if (!cache.loaded) { paint($("#runsCard"), `<div style="padding:8px 14px">${skeletonRows(5, 44)}</div>`); return; }
+  if (!all.length) {
+    paint($("#runsCard"), emptyState(ICON_SVG.runs, "No analyses yet", "Every run you start is kept here, with its findings, grounding and cost.",
+      `<a class="btn primary sm" href="#/new">Start an analysis</a>`));
+    return;
+  }
+  paint($("#runsCard"), `<div class="runs-head"><span>Paper</span><span>Status</span><span>Findings</span><span>Grounded</span><span>Time</span><span>Cost</span><span>Started</span></div>` +
+    (list.length ? list.map((r, i) => `<a class="runs-row" href="#/run/${encodeURIComponent(r.analysis_id)}" style="--i:${i}">
+      <span class="r-paper"><span class="doc-ico" style="--cover:${coverFor(r.document_id)}">${monogram(runName(r))}</span>
+        <span style="min-width:0"><b>${esc(runName(r))}</b><small>${esc(r.analysis_id)}</small></span></span>
+      <span><span class="lbl">Status</span>${ACTIVE(r.status)
+        ? `<span class="r-prog">${runPill(r.status)}<span class="progress"><i style="width:${Math.round((r.progress || 0) * 100)}%"></i></span></span>`
+        : runPill(r.status)}</span>
+      <span class="r-num"><span class="lbl">Findings</span>${r.findings || "—"}</span>
+      <span><span class="lbl">Grounded</span>${meter(r.grounded_rate)}</span>
+      <span class="r-num"><span class="lbl">Time</span>${fmtDuration(r.duration_seconds)}</span>
+      <span class="r-num"><span class="lbl">Cost</span>${fmtCost(r.estimated_cost_usd)}</span>
+      <span class="r-num"><span class="lbl">Started</span>${ago(r.created_at)}</span>
+    </a>`).join("") : `<div class="empty">No runs match these filters.</div>`));
+}
+$("#runsFilter").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) { runsUI.f = b.dataset.f; renderRuns(); } });
+$("#runsQ").addEventListener("input", (e) => { runsUI.q = e.target.value; renderRuns(); });
+
+function renderSettings() {
+  $("#profPapers").textContent = cache.loaded ? `${cache.papers.length}` : "—";
+}
+
+/* ================================================================ routing */
+const VIEWS = ["home", "new", "library", "runs", "run", "settings"];
+const VIEW_TITLE = { home: "Home", new: "New analysis", library: "Library", runs: "Runs", run: "Run", settings: "Settings" };
+let view = null;
+function parseRoute() {
+  const hash = location.hash.replace(/^#\/?/, "");
+  if (/^analysis-[\w-]+$/.test(hash)) return { view: "run", id: hash };   // links from before the redesign
+  const [name, id] = hash.split("/");
+  return VIEWS.includes(name) ? { view: name, id: id ? decodeURIComponent(id) : null } : { view: "home", id: null };
+}
+function route() {
+  if (!me) return;
+  const { view: next, id } = parseRoute();
+  if (next === "run") {
+    if (id === "demo") { if (run.kind !== "demo") startDemo(); }
+    else if (id && id !== "live") { if (id !== run.id) openAnalysis(id, cache.runs.find((r) => r.analysis_id === id)?.title); }
+    else if (run.kind === "idle") { location.replace("#/new"); return; }
+  }
+  showView(next);
+}
+window.addEventListener("hashchange", route);
+function setCrumb() {
+  const crumb = $("#crumb");
+  if (view === "run") {
+    crumb.innerHTML = `${run.kind === "demo" ? "Demo" : "Runs"}<span>/</span>${esc(run.title || "Run")}`;
+    $("#runId").textContent = run.kind === "demo" ? "simulated events, no model calls" : run.id || "";
+  } else {
+    crumb.textContent = VIEW_TITLE[view] || "";
+  }
+  document.title = `${view === "run" ? run.title || "Run" : VIEW_TITLE[view]} · PaperMind`;
+}
+function showView(next) {
+  const changed = next !== view;
+  view = next;
+  $$(".view").forEach((s) => { s.hidden = s.dataset.view !== next; });
+  const navKey = next === "run" ? (run.kind === "demo" ? "demo" : "runs") : next;
+  $$("[data-nav]").forEach((a) => {
+    if (a.dataset.nav === navKey) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+  setCrumb();
+  toggleNav(false);
+  if (changed) window.scrollTo({ top: 0 });
+  paintView();
+  if (LISTED_VIEWS.has(next) && Date.now() - cache.at > 8000) refreshData();
+}
+function paintView() {
+  if (view === "home") renderHome();
+  else if (view === "library") renderLibrary();
+  else if (view === "runs") renderRuns();
+  else if (view === "settings") renderSettings();
+}
+
+/* ---------- mobile navigation ---------- */
+function toggleNav(open) {
+  const app = $("#appView"), next = open ?? !app.classList.contains("nav-open");
+  app.classList.toggle("nav-open", next);
+  $("#scrim").hidden = !next;
+  $("#menuBtn").setAttribute("aria-expanded", String(next));
+}
+$("#menuBtn").addEventListener("click", () => toggleNav());
+$("#scrim").addEventListener("click", () => toggleNav(false));
+
+/* ---------- analysing a paper already in the library ---------- */
+async function startAnalysis(documentId, token) {
+  const start = await api(`/papers/${encodeURIComponent(documentId)}/analyze`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wait: false }),
+  });
+  if (!start.ok) throw await apiError(start);
+  const started = await start.json();
+  if (run.token !== token) return;
+  run.id = started.analysis_id;
+  history.replaceState(null, "", `#/run/${run.id}`);
+  setCrumb();
+  rememberRun();
+  poll(token);
+}
+async function analyseExisting(documentId, title) {
+  const token = newRun("live", title);
+  location.hash = "#/run/live";
+  applyEvent({ stage: "upload", status: "completed", message: "Using the copy already in your library", at: new Date().toISOString(), local: true, detail: { document: documentId } });
+  try { await startAnalysis(documentId, token); }
+  catch (err) { failRun(token, err.message); }
+}
+
+/* ================================================================ command palette */
+const NAV_ITEMS = [
+  { label: "Home", sub: "Your dashboard", href: "#/home", icon: ICON_SVG.home },
+  { label: "New analysis", sub: "Upload a PDF", href: "#/new", icon: ICON_SVG.plus, key: "N" },
+  { label: "Library", sub: "Every paper you've uploaded", href: "#/library", icon: ICON_SVG.library },
+  { label: "Runs", sub: "Analysis history", href: "#/runs", icon: ICON_SVG.runs },
+  { label: "Demo run", sub: "Watch a simulated analysis", href: "#/run/demo", icon: ICON_SVG.play },
+  { label: "Settings", sub: "Account, password and theme", href: "#/settings", icon: ICON_SVG.gear },
+  { label: "Change theme", sub: "Cycle to the next theme", action: () => cycleTheme(), icon: ICON_SVG.palette, key: "T" },
+  { label: "Sign out", sub: me ? me.email : "", action: () => signOut(), icon: ICON_SVG.out },
+];
+const pal = { items: [], sel: 0 };
+function openPalette() {
+  if (!me) return;
+  $("#palette").hidden = false;
+  $("#palQ").value = "";
+  pal.sel = 0;
+  renderPalette();
+  $("#palQ").focus();
+  if (Date.now() - cache.at > 8000) refreshData();
+}
+function closePalette() { $("#palette").hidden = true; }
+function renderPalette() {
+  const q = $("#palQ").value.trim().toLowerCase();
+  const hit = (...s) => !q || s.some((x) => String(x || "").toLowerCase().includes(q));
+  const latestRun = {};
+  for (const r of cache.runs) latestRun[r.document_id] ??= r;
+  const groups = [
+    ["Papers", cache.papers.filter((p) => hit(p.title, p.filename)).slice(0, q ? 8 : 4).map((p) => {
+      const r = latestRun[p.document_id];
+      return { label: paperTitle(p), sub: `${p.page_count ? `${p.page_count} pages · ` : ""}${p.filename || ""}`,
+        href: r ? `#/run/${r.analysis_id}` : "#/library", mono: paperTitle(p), cover: coverFor(p.document_id) };
+    })],
+    ["Runs", cache.runs.filter((r) => hit(r.title, r.analysis_id)).slice(0, q ? 8 : 4).map((r) => ({
+      label: runName(r), sub: `${r.analysis_id} · ${ago(r.created_at)}`, href: `#/run/${r.analysis_id}`,
+      mono: runName(r), cover: coverFor(r.document_id), pill: runPill(r.status) }))],
+    ["Go to", NAV_ITEMS.filter((n) => hit(n.label, n.sub))],
+  ].filter(([, items]) => items.length);
+  pal.items = groups.flatMap(([, items]) => items);
+  pal.sel = clamp(pal.sel, 0, Math.max(0, pal.items.length - 1));
+  let i = 0;
+  $("#palList").innerHTML = pal.items.length ? groups.map(([name, items]) => `<li class="grp" role="presentation">${name}</li>` + items.map((it) => {
+    const idx = i++;
+    const ico = it.icon ? `<span class="o-ico"><svg viewBox="0 0 24 24">${it.icon}</svg></span>`
+      : `<span class="o-ico" style="background:${it.cover};color:#fff;border:0">${monogram(it.mono)}</span>`;
+    return `<li class="opt" role="option" data-i="${idx}" aria-selected="${idx === pal.sel}">${ico}
+      <span style="min-width:0"><b>${esc(it.label)}</b>${it.sub ? `<small>${esc(it.sub)}</small>` : ""}</span>
+      ${it.pill || (it.key ? `<kbd>${it.key}</kbd>` : "<span></span>")}</li>`;
+  }).join("")).join("") : `<li class="palette-empty">Nothing matches “${esc(q)}”.</li>`;
+  $("#palList [aria-selected=true]")?.scrollIntoView({ block: "nearest" });
+}
+function choose(item) {
+  if (!item) return;
+  closePalette();
+  if (item.action) item.action();
+  else location.hash = item.href;
+}
+$("#palQ").addEventListener("input", () => { pal.sel = 0; renderPalette(); });
+$("#palQ").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    const n = pal.items.length;
+    if (n) { pal.sel = (pal.sel + (e.key === "ArrowDown" ? 1 : n - 1)) % n; renderPalette(); }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    choose(pal.items[pal.sel]);
+  }
+});
+$("#palList").addEventListener("click", (e) => { const o = e.target.closest("[data-i]"); if (o) choose(pal.items[+o.dataset.i]); });
+$("#palette").addEventListener("click", (e) => { if (e.target === e.currentTarget) closePalette(); });
+$("#jumpBtn").addEventListener("click", openPalette);
+$("#jumpKey").textContent = isMac ? "⌘K" : "Ctrl K";
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    if ($("#palette").hidden) openPalette(); else closePalette();
+    return;
+  }
+  if (e.key === "Escape") {
+    if (!$("#palette").hidden) { closePalette(); return; }
+    if ($("#appView").classList.contains("nav-open")) { toggleNav(false); return; }
+  }
+  if (!me || e.target.closest("input, textarea, select") || e.metaKey || e.ctrlKey || e.altKey || !$("#palette").hidden) return;
+  if (e.key === "/") { e.preventDefault(); openPalette(); }
+  else if (e.key === "n" || e.key === "N") location.hash = "#/new";
+});
 
 /* ================================================================ boot */
 paintGraph();
 renderInspector();
-renderRecent();
-const hashId = decodeURIComponent(location.hash.slice(1));
-if (/^analysis-[\w-]+$/.test(hashId)) openAnalysis(hashId);
+(async function start() {
+  try {
+    const res = await fetch("/auth/me");
+    if (res.ok) { enterApp(await res.json()); return; }
+  } catch { /* offline: the sign-in screen says so when it's used */ }
+  showAuth();
+})();
 })();
 </script>
 </body>

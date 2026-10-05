@@ -7,6 +7,7 @@ with the deterministic mock provider.
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -69,19 +70,28 @@ class Settings(BaseSettings):
     embedding_api_key: str | None = None
     embedding_dim: int = Field(default=512, gt=0)
 
+    # --- Accounts and API access ------------------------------------------
+    #: Code a new account must enter to sign up. Unset lets anyone who can reach
+    #: the server create an account, which suits a laptop and nothing else; the
+    #: server warns about it at startup and in ``/health``.
+    invite_code: str | None = None
+    #: Uploads plus analysis starts one account may make per window; these are
+    #: the requests that spend disk and model budget. 0 disables the limit.
+    rate_limit_requests: int = Field(default=60, ge=0)
+    rate_limit_window_seconds: int = Field(default=3600, gt=0)
+
     # --- Ingestion --------------------------------------------------------
     max_upload_mb: float = Field(default=50.0, gt=0)
+    #: Send pages that fail the extraction check to PaddleOCR-VL (llama-server).
     ocr_enabled: bool = True
+    #: Below this many characters, a page's text layer fails the extraction check.
     ocr_min_chars_per_page: int = Field(default=180, ge=0)
-    ocr_language: str = "eng"
-    #: "tesseract" (local binary) or "paddleocr_vl" (PaddleOCR-VL in llama-server).
-    ocr_engine: Literal["tesseract", "paddleocr_vl"] = "tesseract"
     #: OpenAI-compatible endpoint of the llama-server running PaddleOCR-VL.
     ocr_base_url: str = "http://127.0.0.1:8080/v1"
     ocr_model: str = "PaddleOCR-VL-1.6"
     ocr_timeout_seconds: float = Field(default=300.0, gt=0)
-    #: Also read charts and diagrams on text pages (engines that support it, i.e.
-    #: paddleocr_vl). Text itself always comes from PyMuPDF on those pages.
+    #: Also read charts and diagrams on pages that pass the extraction check.
+    #: Text itself always comes from PyMuPDF on those pages.
     ocr_figures_enabled: bool = True
     #: Re-read tables on text pages to recover merged headers and cell order;
     #: the reading replaces the native text only when it agrees with it.
@@ -127,7 +137,11 @@ class Settings(BaseSettings):
 
     # --- Storage ----------------------------------------------------------
     data_dir: Path = Path("./data")
+    #: ``sqlite:///path`` (the default, a local file) or a ``postgresql://`` URL
+    #: such as a Supabase connection string.
     database_url: str = "sqlite:///./data/paperpilot.sqlite"
+    #: Postgres only: the schema PaperMind's tables live in.
+    database_schema: str = "paperpilot"
 
     # --- Observability ----------------------------------------------------
     log_level: str = "INFO"
@@ -156,8 +170,6 @@ class Settings(BaseSettings):
         """Keyword arguments for :func:`paperpilot.ingestion.ocr.build_ocr_engine`."""
         return {
             "enabled": self.ocr_enabled,
-            "language": self.ocr_language,
-            "engine": self.ocr_engine,
             "base_url": self.ocr_base_url,
             "model": self.ocr_model,
             "timeout": self.ocr_timeout_seconds,
@@ -205,14 +217,16 @@ class Settings(BaseSettings):
     def ensure_directories(self) -> None:
         for path in (self.data_dir, self.upload_dir, self.index_dir, self.report_dir):
             path.mkdir(parents=True, exist_ok=True)
-        self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.database_url.startswith("sqlite"):
+            self.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
 
     def redacted(self) -> dict:
         """Configuration snapshot safe to log: secrets are masked."""
         data = self.model_dump(mode="json")
-        for key in ("llm_api_key", "embedding_api_key"):
+        for key in ("llm_api_key", "embedding_api_key", "invite_code"):
             if data.get(key):
                 data[key] = "***redacted***"
+        data["database_url"] = re.sub(r"(://[^:/@]+:)[^@]+@", r"\1***@", data["database_url"])
         return data
 
 

@@ -182,18 +182,32 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     from .ingestion.service import IngestionService
     from .providers.embeddings import build_embedding_provider
 
+    service = IngestionService(settings, embedder=build_embedding_provider(settings))
     try:
-        result = IngestionService(
-            settings, embedder=build_embedding_provider(settings)
-        ).ingest(path)
+        result = service.ingest(path)
     except PaperPilotError as exc:
         print(f"error [{exc.code}]: {exc.message}", file=sys.stderr)
         return EXIT_BAD_INPUT
 
     metadata = result.metadata
     if args.json_out or args.format == "json":
+        ocr_engine = service.ocr_engine
         payload = {
             "metadata": metadata.model_dump(mode="json"),
+            "extraction": {
+                "ocr_enabled": settings.ocr_enabled,
+                "ocr_engine": ocr_engine.name,
+                "ocr_available": ocr_engine.available,
+                "ocr_base_url": settings.ocr_base_url if settings.ocr_enabled else None,
+                "ocr_min_chars_per_page": settings.ocr_min_chars_per_page,
+            },
+            "pages": [
+                {
+                    **page.to_model().model_dump(mode="json"),
+                    "extraction_failures": page.extraction_failures,
+                }
+                for page in result.parsed.pages
+            ],
             "chunks": [c.model_dump(mode="json") for c in result.chunks],
         }
         text = json.dumps(payload, indent=2, default=str)
@@ -230,6 +244,38 @@ def cmd_serve(args: argparse.Namespace) -> int:
         port=args.port,
         reload=args.reload,
         log_level=settings.log_level.lower(),
+    )
+    return EXIT_OK
+
+
+def cmd_migrate_db(args: argparse.Namespace) -> int:
+    """Copy a local SQLite database into PAPERPILOT_DATABASE_URL (e.g. Supabase)."""
+    from .storage.factory import build_repositories
+    from .storage.migrate import copy_from_sqlite
+    from .storage.postgres_repo import is_postgres_url
+
+    settings = _build_settings(args)
+    configure_logging("WARNING", settings.log_format, http=False)
+    source = Path(args.source).expanduser().resolve()
+    if not is_postgres_url(settings.database_url):
+        print(
+            "error: PAPERPILOT_DATABASE_URL must point at the PostgreSQL database to copy "
+            "into (your Supabase connection string)",
+            file=sys.stderr,
+        )
+        return EXIT_BAD_INPUT
+    try:
+        documents, analyses, users = build_repositories(settings)
+        counts = copy_from_sqlite(source, documents=documents, analyses=analyses, users=users)
+    except PaperPilotError as exc:
+        print(f"error: {exc.message}", file=sys.stderr)
+        return EXIT_FAILED
+    print(
+        f"Copied {counts['users']} account(s), {counts['documents']} paper(s) and "
+        f"{counts['analyses']} analysis/analyses from {source}."
+        + (f" {counts['users_skipped']} account(s) already existed and were left as they are."
+           if counts["users_skipped"] else "")
+        + "\nUploaded PDFs and reports stay in the data directory; keep it with the server."
     )
     return EXIT_OK
 
@@ -333,6 +379,14 @@ def build_parser() -> argparse.ArgumentParser:
     schema = sub.add_parser("schema", help="print the JSON Schema of parsed model responses")
     schema.add_argument("-o", "--output", help="write the schema here instead of stdout")
     schema.set_defaults(func=cmd_schema)
+
+    migrate = sub.add_parser(
+        "migrate-db", help="copy a SQLite database into PAPERPILOT_DATABASE_URL (e.g. Supabase)"
+    )
+    migrate.add_argument(
+        "--from", dest="source", default="./data/paperpilot.sqlite", help="SQLite file to copy from"
+    )
+    migrate.set_defaults(func=cmd_migrate_db)
 
     parse = sub.add_parser("parse", help="parse a Markdown file into the response-document JSON")
     parse.add_argument("markdown", help="path to a Markdown file, or - for stdin")

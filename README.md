@@ -233,17 +233,35 @@ GET  /analyses/{analysis_id}/report   the Markdown report
 GET  /analyses/{analysis_id}/findings structured findings + verification
 GET  /analyses/{analysis_id}/responses every model answer: Markdown + parsed JSON document
 GET  /schemas/response-document       JSON Schema of the parsed model answer
+GET  /analyses                        your analyses, newest first, with headline numbers
+POST /auth/signup | /auth/login       create an account / sign in (sets the session cookie)
+POST /auth/logout                     end the session
+GET  /auth/me                         the signed-in account
+POST /auth/password                   change password (signs out other sessions)
 GET  /health                          liveness and configuration
 GET  /                                minimal web UI
 ```
 
 ```bash
-DOC=$(curl -sF "file=@paper.pdf" localhost:8000/papers | jq -r .document_id)
-AID=$(curl -sX POST localhost:8000/papers/$DOC/analyze | jq -r .analysis_id)
+# Sign in once; the response carries a session token for scripts.
+TOKEN=$(curl -s -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"..."}' localhost:8000/auth/login | jq -r .token)
+AUTH="Authorization: Bearer $TOKEN"
+DOC=$(curl -sH "$AUTH" -F "file=@paper.pdf" localhost:8000/papers | jq -r .document_id)
+AID=$(curl -sH "$AUTH" -X POST localhost:8000/papers/$DOC/analyze | jq -r .analysis_id)
 
-curl -s localhost:8000/analyses/$AID | jq '{status, progress, stage}'
-curl -s localhost:8000/analyses/$AID/report
+curl -sH "$AUTH" localhost:8000/analyses/$AID | jq '{status, progress, stage}'
+curl -sH "$AUTH" localhost:8000/analyses/$AID/report
 ```
+
+Every endpoint except `/`, `/health`, the API docs and `/auth/*` needs a
+signed-in account: the web UI uses an HttpOnly session cookie, scripts send the
+token from `/auth/login` as `Authorization: Bearer <token>`. Each account sees
+only its own papers and analyses; the first account created inherits anything
+uploaded before accounts existed. Sign-up needs `PAPERPILOT_INVITE_CODE` when it
+is set. Uploads and analysis starts are rate limited per account (`429` with
+`Retry-After`), sign-in attempts per address, and an upload is cut off with
+`413` as soon as it passes `PAPERPILOT_MAX_UPLOAD_MB`.
 
 Analysis runs on a background worker and returns `202` immediately; poll
 `GET /analyses/{analysis_id}` for `status`, `progress` (0–1) and the full event
@@ -512,13 +530,15 @@ Secrets are never logged — `Settings.redacted()` masks them.
 | `PAPERPILOT_LLM_BASE_URL` | OpenAI | Any compatible endpoint |
 | `PAPERPILOT_LLM_API_KEY` | — | Never commit this |
 | `PAPERPILOT_EMBEDDING_PROVIDER` | `hashing` | `hashing`, `openai_compatible`, `sentence_transformers` |
-| `PAPERPILOT_MAX_UPLOAD_MB` | `50` | Upload size limit |
-| `PAPERPILOT_OCR_ENABLED` | `true` | OCR fallback for scanned pages |
-| `PAPERPILOT_OCR_ENGINE` | `tesseract` | `tesseract` or `paddleocr_vl` |
-| `PAPERPILOT_OCR_BASE_URL` | `http://127.0.0.1:8080/v1` | `paddleocr_vl` only: llama-server endpoint |
-| `PAPERPILOT_OCR_FIGURES_ENABLED` | `true` | `paddleocr_vl` only: also read charts and diagrams on text pages |
-| `PAPERPILOT_OCR_TABLES_ENABLED` | `true` | `paddleocr_vl` only: re-read tables for their headers and cell grid |
-| `PAPERPILOT_OCR_MIN_CHARS_PER_PAGE` | `180` | Below this, a page is an OCR candidate |
+| `PAPERPILOT_INVITE_CODE` | — | Code required to create an account; unset lets anyone sign up (warned at startup and in `/health`) |
+| `PAPERPILOT_RATE_LIMIT_REQUESTS` | `60` | Uploads + analysis starts per account per window; `0` disables |
+| `PAPERPILOT_RATE_LIMIT_WINDOW_SECONDS` | `3600` | Rate-limit window |
+| `PAPERPILOT_MAX_UPLOAD_MB` | `50` | Upload size limit, enforced while the upload streams in |
+| `PAPERPILOT_OCR_ENABLED` | `true` | Send pages that fail the extraction check to PaddleOCR-VL |
+| `PAPERPILOT_OCR_BASE_URL` | `http://127.0.0.1:8080/v1` | llama-server endpoint running PaddleOCR-VL |
+| `PAPERPILOT_OCR_FIGURES_ENABLED` | `true` | Also read charts and diagrams on text pages |
+| `PAPERPILOT_OCR_TABLES_ENABLED` | `true` | Re-read tables for their headers and cell grid |
+| `PAPERPILOT_OCR_MIN_CHARS_PER_PAGE` | `180` | Below this, a page fails the extraction check |
 | `PAPERPILOT_LAYOUT_ENABLED` | `false` | Analyse page layout with PP-Structure |
 | `PAPERPILOT_LAYOUT_MODEL` | `PP-DocLayout_plus-L` | Pinned layout detector |
 | `PAPERPILOT_LAYOUT_DPI` | `200` | Rasterisation DPI; part of the layout cache key |
@@ -530,10 +550,39 @@ Secrets are never logged — `Settings.redacted()` masks them.
 | `PAPERPILOT_MATH_MIN_EQUATIONS` | `3` | Math Agent activation threshold |
 | `PAPERPILOT_PARALLEL_AGENTS` | `true` | Run specialists concurrently |
 | `PAPERPILOT_DATA_DIR` | `./data` | Uploads, indexes, reports, SQLite |
+| `PAPERPILOT_DATABASE_URL` | local SQLite | `sqlite:///path` or `postgresql://…` (e.g. Supabase) |
+| `PAPERPILOT_DATABASE_SCHEMA` | `paperpilot` | PostgreSQL only: schema for PaperMind's tables |
 | `PAPERPILOT_LOG_FORMAT` | `json` | `json` or `text` |
+
+### Database: SQLite or Supabase
+
+Records (accounts, sessions, papers, analyses) live in SQLite by default. To use
+Supabase (or any PostgreSQL 13+):
+
+```bash
+pip install -e ".[postgres]"
+# .env — Supabase: Project → Connect → Session pooler, with your database password
+PAPERPILOT_DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+
+python -m paperpilot migrate-db --from ./data/paperpilot.sqlite   # optional: bring existing data
+make serve
+```
+
+Tables are created on first start in their own `paperpilot` schema, with
+row-level security on and no policies, so Supabase's public Data API (the anon
+key) cannot read them; the server connects as their owner. Uploaded PDFs and
+reports still live in `PAPERPILOT_DATA_DIR`. The storage tests run against
+PostgreSQL too when `PAPERPILOT_TEST_DATABASE_URL` is set.
 
 ### Security
 
+- The API refuses calls without a session before reading their body. Passwords
+  are hashed with scrypt; only a SHA-256 of each session token is stored. The
+  session cookie is HttpOnly and SameSite=Lax (and Secure over HTTPS), and no
+  CORS headers are sent, so other sites cannot act with a visitor's session.
+- Set `PAPERPILOT_INVITE_CODE` before exposing the port beyond your machine.
+- Sign-in attempts are rate limited per client IP. Behind a reverse proxy, run
+  uvicorn with `--proxy-headers` so the client IP is the real one.
 - PDFs are validated by extension, magic header and size **before parsing**.
 - Uploaded filenames are reduced to a basename and sanitised; traversal is not
   possible.
@@ -622,8 +671,7 @@ keyed by the page image *and* the full engine configuration. The same PDF yields
 a byte-identical report on every run, with the cache cold, warm, or disabled.
 
 - **OCR pages are approximate by construction.** Quotes from them match fuzzily
-  and carry reduced confidence. Tesseract must be installed separately; or set
-  `PAPERPILOT_OCR_ENGINE=paddleocr_vl` to use PaddleOCR-VL-1.6, served locally:
+  and carry reduced confidence. OCR is done by PaddleOCR-VL-1.6, served locally:
 
   ```bash
   brew install llama.cpp
@@ -631,8 +679,13 @@ a byte-identical report on every run, with the cache cold, warm, or disabled.
   make ocr-server   # keep running alongside `paperpilot serve`
   ```
 
-  With `paddleocr_vl`, extraction is routed per page and per region: text pages
-  keep PyMuPDF's text layer; scanned pages are read whole by the model; charts
+  Extraction is routed per page and per region. Every page's text layer goes
+  through a deterministic extraction check; a page fails it when the layer is
+  thin, mostly symbols, full of glyphs the font could not map to Unicode,
+  garbled (non-words, or words run together with no spaces), or laid over a
+  full-page scan. Failed pages are read whole by the model and its reading is
+  used as-is; if the model is unreachable the native text is kept at confidence
+  0.4. Pages that pass keep PyMuPDF's text layer; charts
   and diagrams on text pages (embedded images, or vector drawings that are not
   ruled tables) are cropped and read by the model as `figure` chunks linked to
   their caption. Chart values are indexed only when printed in the figure — the

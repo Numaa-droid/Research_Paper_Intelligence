@@ -43,6 +43,30 @@ class FileTooLargeError(ValidationError):
     http_status = 413
 
 
+class AuthenticationError(PaperPilotError):
+    code = "unauthorized"
+    http_status = 401
+
+
+class ForbiddenError(PaperPilotError):
+    code = "forbidden"
+    http_status = 403
+
+
+class ConflictError(PaperPilotError):
+    code = "conflict"
+    http_status = 409
+
+
+class RateLimitError(PaperPilotError):
+    code = "rate_limited"
+    http_status = 429
+
+    def __init__(self, message: str, *, retry_after: int, details: dict | None = None) -> None:
+        super().__init__(message, details={**(details or {}), "retry_after_seconds": retry_after})
+        self.retry_after = retry_after
+
+
 class IngestionError(PaperPilotError):
     code = "ingestion_error"
     http_status = 422

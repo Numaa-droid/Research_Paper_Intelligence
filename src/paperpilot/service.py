@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO
 
+from .accounts import AccountService
 from .config import Settings, get_settings
 from .domain.enums import TERMINAL_STATUSES, AnalysisStatus
 from .domain.models import AnalysisRecord, PaperMetadata, ProgressEvent
@@ -27,13 +28,10 @@ from .orchestration.graph import AnalysisWorkflow, WorkflowResources
 from .providers.embeddings import build_embedding_provider
 from .providers.llm import build_llm_provider
 from .reporting.synthesizer import ReportSynthesizer
+from .storage.factory import build_repositories
 from .storage.files import LocalFileStorage
-from .storage.repository import AnalysisRepository, DocumentRepository, FileStorage
-from .storage.sqlite_repo import (
-    SQLiteAnalysisRepository,
-    SQLiteConnection,
-    SQLiteDocumentRepository,
-)
+from .storage.repository import AnalysisRepository, DocumentRepository, FileStorage, UserRepository
+from .storage.sqlite_repo import InMemoryUserRepository
 
 
 def new_analysis_id() -> str:
@@ -50,6 +48,7 @@ class PaperPilotService:
         documents: DocumentRepository | None = None,
         analyses: AnalysisRepository | None = None,
         files: FileStorage | None = None,
+        users: UserRepository | None = None,
         llm_provider=None,
         embedding_provider=None,
     ) -> None:
@@ -60,12 +59,15 @@ class PaperPilotService:
         )
 
         if documents is None or analyses is None:
-            connection = SQLiteConnection(self.settings.sqlite_path)
-            documents = documents or SQLiteDocumentRepository(connection)
-            analyses = analyses or SQLiteAnalysisRepository(connection)
+            built_documents, built_analyses, built_users = build_repositories(self.settings)
+            documents = documents or built_documents
+            analyses = analyses or built_analyses
+            users = users or built_users
+        users = users or InMemoryUserRepository()
 
         self.documents = documents
         self.analyses = analyses
+        self.accounts = AccountService(users, documents, settings=self.settings)
         self.files = files or LocalFileStorage(
             upload_dir=self.settings.upload_dir, report_dir=self.settings.report_dir
         )
@@ -81,14 +83,21 @@ class PaperPilotService:
 
     # --- documents --------------------------------------------------------
 
-    def register_upload(self, stream: BinaryIO, *, filename: str) -> PaperMetadata:
+    def register_upload(
+        self, stream: BinaryIO, *, filename: str, owner_id: str | None = None
+    ) -> PaperMetadata:
         """Persist an uploaded PDF and return a stub metadata record.
 
         Parsing happens during analysis, not upload, so a large PDF does not block
         the HTTP request. Only the cheap deterministic checks run here.
         """
         document_id = new_document_id()
-        path = self.files.save_upload(stream, filename=filename, document_id=document_id)
+        path = self.files.save_upload(
+            stream,
+            filename=filename,
+            document_id=document_id,
+            max_bytes=self.settings.max_upload_bytes,
+        )
         try:
             size = validate_pdf_file(path, max_bytes=self.settings.max_upload_bytes)
         except ValidationError:
@@ -100,7 +109,7 @@ class PaperPilotService:
             filename=filename,
             file_size_bytes=size,
         )
-        self.documents.save(metadata)
+        self.documents.save(metadata, owner_id=owner_id)
         info("service.upload_registered", document_id=document_id, bytes=size)
         return metadata
 
@@ -116,14 +125,23 @@ class PaperPilotService:
         self._local_paths[document_id] = path
         return metadata
 
-    def get_document(self, document_id: str) -> PaperMetadata:
+    def get_document(self, document_id: str, *, owner_id: str | None = None) -> PaperMetadata:
+        """The paper's metadata; another account's paper is reported as unknown."""
         metadata = self.documents.get(document_id)
-        if metadata is None:
+        if metadata is None or (
+            owner_id is not None and self.documents.owner_of(document_id) != owner_id
+        ):
             raise NotFoundError(f"unknown document: {document_id}")
         return metadata
 
-    def list_documents(self, *, limit: int = 50) -> list[PaperMetadata]:
-        return self.documents.list(limit=limit)
+    def list_documents(self, *, limit: int = 50, owner_id: str | None = None) -> list[PaperMetadata]:
+        return self.documents.list(limit=limit, owner_id=owner_id)
+
+    def list_analyses(self, *, owner_id: str | None = None, limit: int = 50) -> list[AnalysisRecord]:
+        """Recent analyses of the account's papers, newest first."""
+        papers = self.documents.list(limit=1000, owner_id=owner_id)
+        records = self.analyses.list_for_documents([p.document_id for p in papers], limit=limit)
+        return [self._with_live_status(r) for r in records]
 
     def resolve_path(self, document_id: str) -> Path:
         path = self._local_paths.get(document_id) or self.files.path_for(document_id)
@@ -133,8 +151,8 @@ class PaperPilotService:
 
     # --- analyses ---------------------------------------------------------
 
-    def create_analysis(self, document_id: str) -> AnalysisRecord:
-        self.get_document(document_id)
+    def create_analysis(self, document_id: str, *, owner_id: str | None = None) -> AnalysisRecord:
+        self.get_document(document_id, owner_id=owner_id)
         record = AnalysisRecord(
             analysis_id=new_analysis_id(),
             document_id=document_id,
@@ -143,10 +161,16 @@ class PaperPilotService:
         self.analyses.save(record)
         return record
 
-    def get_analysis(self, analysis_id: str) -> AnalysisRecord:
+    def get_analysis(self, analysis_id: str, *, owner_id: str | None = None) -> AnalysisRecord:
         record = self.analyses.get(analysis_id)
-        if record is None:
+        if record is None or (
+            owner_id is not None and self.documents.owner_of(record.document_id) != owner_id
+        ):
             raise NotFoundError(f"unknown analysis: {analysis_id}")
+        return self._with_live_status(record)
+
+    def _with_live_status(self, record: AnalysisRecord) -> AnalysisRecord:
+        analysis_id = record.analysis_id
         with self._lock:
             live = list(self._live_events.get(analysis_id, ()))
         if live and record.status not in TERMINAL_STATUSES:
@@ -154,8 +178,8 @@ class PaperPilotService:
             record.status = _status_for_stage(live[-1].stage, record.status)
         return record
 
-    def get_report(self, analysis_id: str) -> str:
-        record = self.get_analysis(analysis_id)
+    def get_report(self, analysis_id: str, *, owner_id: str | None = None) -> str:
+        record = self.get_analysis(analysis_id, owner_id=owner_id)
         if record.report_markdown:
             return record.report_markdown
         markdown = self.files.read_report(analysis_id)

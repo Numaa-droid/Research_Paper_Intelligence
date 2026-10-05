@@ -8,8 +8,9 @@ from fastapi import FastAPI
 
 from .. import __version__
 from ..config import Settings, get_settings
-from ..observability import configure_logging, info
+from ..observability import configure_logging, info, warning
 from ..service import PaperPilotService
+from .guard import RateLimiter, SessionMiddleware, UploadSizeMiddleware
 from .routes import register_error_handlers, router
 from .tasks import TaskRunner, ThreadPoolTaskRunner
 
@@ -52,7 +53,10 @@ def create_app(
             llm_provider=settings.llm_provider,
             llm_model=None if settings.llm_provider == "mock" else settings.llm_model,
             embedding_provider=settings.embedding_provider,
+            invite_required=bool(settings.invite_code),
         )
+        if not settings.invite_code:
+            warning("api.open_signup", setting="PAPERPILOT_INVITE_CODE")
         yield
         app.state.task_runner.shutdown()
         info("api.shutdown")
@@ -67,9 +71,20 @@ def create_app(
     app.state.settings = settings
     app.state.service = service or PaperPilotService(settings)
     app.state.task_runner = task_runner or ThreadPoolTaskRunner(max_workers=2)
+    app.state.rate_limiter = (
+        RateLimiter(settings.rate_limit_requests, settings.rate_limit_window_seconds)
+        if settings.rate_limit_requests
+        else None
+    )
+    #: Sign-in and sign-up attempts per client address per 15 minutes.
+    app.state.auth_limiter = RateLimiter(20, 900)
 
     app.include_router(router)
     register_error_handlers(app)
+    # The last middleware added runs first: the session is checked before any
+    # of the body is read.
+    app.add_middleware(UploadSizeMiddleware, max_bytes=settings.max_upload_bytes)
+    app.add_middleware(SessionMiddleware, accounts=app.state.service.accounts)
     return app
 
 

@@ -4,21 +4,31 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .. import __version__
+from ..accounts import MIN_PASSWORD, SESSION_DAYS
 from ..domain.enums import AnalysisStatus
-from ..errors import PaperPilotError, UnsupportedFileError
+from ..errors import AuthenticationError, PaperPilotError, RateLimitError, UnsupportedFileError
 from ..observability import info
 from ..response import SCHEMA_VERSION, response_document_json_schema
 from ..service import PaperPilotService
+from ..storage.repository import User
+from .guard import SESSION_COOKIE, auth_rate_limited, rate_limited, session_token
 from .schemas import (
     AnalysisResponse,
+    AnalysisSummary,
     AnalyzeRequest,
+    AuthConfigResponse,
+    AuthResponse,
+    ChangePasswordRequest,
     DocumentResponse,
     HealthResponse,
+    LoginRequest,
+    SignUpRequest,
     UploadResponse,
+    UserResponse,
 )
 
 router = APIRouter()
@@ -34,6 +44,109 @@ def get_runner(request: Request):
     return request.app.state.task_runner
 
 
+def current_user(request: Request) -> User:
+    """The signed-in account; ``SessionMiddleware`` already refused anonymous calls."""
+    user = getattr(request.state, "user", None)
+    if user is None:
+        raise AuthenticationError("please sign in")
+    return user
+
+
+def _user_response(user: User) -> UserResponse:
+    return UserResponse(user_id=user.user_id, email=user.email, name=user.name, created_at=user.created_at)
+
+
+def _signed_in(request: Request, response: Response, user: User, token: str) -> AuthResponse:
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        max_age=SESSION_DAYS * 86400,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/",
+    )
+    return AuthResponse(user=_user_response(user), token=token)
+
+
+# --- accounts ----------------------------------------------------------------
+
+
+@router.get("/auth/config", response_model=AuthConfigResponse, tags=["auth"])
+def auth_config(service: PaperPilotService = Depends(get_service)) -> AuthConfigResponse:
+    """What the sign-up form must ask for."""
+    return AuthConfigResponse(
+        invite_required=service.accounts.invite_required, min_password_length=MIN_PASSWORD
+    )
+
+
+@router.post(
+    "/auth/signup",
+    response_model=AuthResponse,
+    status_code=201,
+    tags=["auth"],
+    dependencies=[Depends(auth_rate_limited)],
+)
+def sign_up(
+    payload: SignUpRequest,
+    request: Request,
+    response: Response,
+    service: PaperPilotService = Depends(get_service),
+) -> AuthResponse:
+    """Create an account (with the invite code, when one is configured) and sign in."""
+    user, token = service.accounts.sign_up(
+        name=payload.name, email=payload.email, password=payload.password, invite_code=payload.invite_code
+    )
+    return _signed_in(request, response, user, token)
+
+
+@router.post(
+    "/auth/login", response_model=AuthResponse, tags=["auth"], dependencies=[Depends(auth_rate_limited)]
+)
+def log_in(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    service: PaperPilotService = Depends(get_service),
+) -> AuthResponse:
+    user, token = service.accounts.log_in(email=payload.email, password=payload.password)
+    return _signed_in(request, response, user, token)
+
+
+@router.post("/auth/logout", status_code=204, tags=["auth"])
+def log_out(request: Request, service: PaperPilotService = Depends(get_service)) -> Response:
+    token = session_token(request.scope)
+    if token:
+        service.accounts.log_out(token)
+    response = Response(status_code=204)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
+
+
+@router.get("/auth/me", response_model=UserResponse, tags=["auth"])
+def me(user: User = Depends(current_user)) -> UserResponse:
+    return _user_response(user)
+
+
+@router.post(
+    "/auth/password", status_code=204, tags=["auth"], dependencies=[Depends(auth_rate_limited)]
+)
+def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+) -> Response:
+    """Change the password; every other session of the account is signed out."""
+    service.accounts.change_password(
+        user,
+        current=payload.current_password,
+        new=payload.new_password,
+        token=session_token(request.scope) or "",
+    )
+    return Response(status_code=204)
+
+
 @router.get("/health", response_model=HealthResponse, tags=["system"])
 def health(service: PaperPilotService = Depends(get_service)) -> HealthResponse:
     """Liveness plus the configuration facts a caller needs to interpret results."""
@@ -43,20 +156,21 @@ def health(service: PaperPilotService = Depends(get_service)) -> HealthResponse:
     ocr = build_ocr_engine(**settings.ocr_engine_options())
 
     warnings: list[str] = []
+    if not settings.invite_code:
+        warnings.append(
+            "No invite code is configured: anyone who can reach this server can create an "
+            "account and spend the model budget. Set PAPERPILOT_INVITE_CODE before exposing it."
+        )
     if settings.llm_provider == "mock":
         warnings.append(
             "The deterministic mock provider is active: the pipeline runs end to end, "
             "but reports are not a real analysis. Set PAPERPILOT_LLM_PROVIDER."
         )
     if settings.ocr_enabled and not ocr.available:
-        unavailable = (
-            f"the PaddleOCR-VL server at {settings.ocr_base_url} is not reachable"
-            if settings.ocr_engine == "paddleocr_vl"
-            else "Tesseract is unavailable"
-        )
         warnings.append(
-            f"OCR is enabled but {unavailable}; scanned pages will be indexed "
-            "with whatever native text exists."
+            f"OCR is enabled but the PaddleOCR-VL server at {settings.ocr_base_url} is not "
+            "reachable; pages that fail the extraction check will be indexed with whatever "
+            "native text exists."
         )
     if settings.embedding_provider == "hashing":
         warnings.append(
@@ -73,9 +187,16 @@ def health(service: PaperPilotService = Depends(get_service)) -> HealthResponse:
     )
 
 
-@router.post("/papers", response_model=UploadResponse, status_code=201, tags=["papers"])
+@router.post(
+    "/papers",
+    response_model=UploadResponse,
+    status_code=201,
+    tags=["papers"],
+    dependencies=[Depends(rate_limited)],
+)
 async def upload_paper(
     file: UploadFile = File(..., description="A research-paper PDF"),
+    user: User = Depends(current_user),
     service: PaperPilotService = Depends(get_service),
 ) -> UploadResponse:
     """Accept one PDF and return its document identifier."""
@@ -88,7 +209,9 @@ async def upload_paper(
             f"expected a PDF upload, got content type '{file.content_type}'"
         )
 
-    metadata = service.register_upload(file.file, filename=file.filename or "upload.pdf")
+    metadata = service.register_upload(
+        file.file, filename=file.filename or "upload.pdf", owner_id=user.user_id
+    )
     info("api.upload", document_id=metadata.document_id, bytes=metadata.file_size_bytes)
     return UploadResponse(
         document_id=metadata.document_id,
@@ -99,16 +222,23 @@ async def upload_paper(
 
 @router.get("/papers", response_model=list[DocumentResponse], tags=["papers"])
 def list_papers(
-    limit: int = 50, service: PaperPilotService = Depends(get_service)
+    limit: int = 50,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
 ) -> list[DocumentResponse]:
-    return [DocumentResponse.from_metadata(m) for m in service.list_documents(limit=limit)]
+    return [
+        DocumentResponse.from_metadata(m)
+        for m in service.list_documents(limit=limit, owner_id=user.user_id)
+    ]
 
 
 @router.get("/papers/{document_id}", response_model=DocumentResponse, tags=["papers"])
 def get_paper(
-    document_id: str, service: PaperPilotService = Depends(get_service)
+    document_id: str,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
 ) -> DocumentResponse:
-    return DocumentResponse.from_metadata(service.get_document(document_id))
+    return DocumentResponse.from_metadata(service.get_document(document_id, owner_id=user.user_id))
 
 
 @router.post(
@@ -116,10 +246,12 @@ def get_paper(
     response_model=AnalysisResponse,
     status_code=202,
     tags=["analyses"],
+    dependencies=[Depends(rate_limited)],
 )
 def analyze_paper(
     document_id: str,
     payload: AnalyzeRequest | None = None,
+    user: User = Depends(current_user),
     service: PaperPilotService = Depends(get_service),
     runner=Depends(get_runner),
 ) -> AnalysisResponse:
@@ -129,7 +261,7 @@ def analyze_paper(
     ``GET /analyses/{analysis_id}`` for progress. Pass ``{"wait": true}`` to block
     until the run finishes (small papers only).
     """
-    record = service.create_analysis(document_id)
+    record = service.create_analysis(document_id, owner_id=user.user_id)
     options = payload or AnalyzeRequest()
 
     if options.wait:
@@ -142,22 +274,42 @@ def analyze_paper(
     return AnalysisResponse.from_record(service.get_analysis(record.analysis_id))
 
 
+@router.get("/analyses", response_model=list[AnalysisSummary], tags=["analyses"])
+def list_analyses(
+    limit: int = 50,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+) -> list[AnalysisSummary]:
+    """The account's analyses, newest first, with headline numbers for each."""
+    titles = {
+        m.document_id: m.title or m.filename
+        for m in service.list_documents(limit=1000, owner_id=user.user_id)
+    }
+    return [
+        AnalysisSummary.from_record(r, titles.get(r.document_id))
+        for r in service.list_analyses(owner_id=user.user_id, limit=limit)
+    ]
+
+
 @router.get("/analyses/{analysis_id}", response_model=AnalysisResponse, tags=["analyses"])
 def get_analysis(
-    analysis_id: str, service: PaperPilotService = Depends(get_service)
+    analysis_id: str,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
 ) -> AnalysisResponse:
     """Poll an analysis. Safe to call as often as a client likes."""
-    return AnalysisResponse.from_record(service.get_analysis(analysis_id))
+    return AnalysisResponse.from_record(service.get_analysis(analysis_id, owner_id=user.user_id))
 
 
 @router.get("/analyses/{analysis_id}/report", tags=["analyses"])
 def get_report(
     analysis_id: str,
     format: str = "markdown",
+    user: User = Depends(current_user),
     service: PaperPilotService = Depends(get_service),
 ):
     """Return the final Markdown report."""
-    record = service.get_analysis(analysis_id)
+    record = service.get_analysis(analysis_id, owner_id=user.user_id)
     if record.status is not AnalysisStatus.COMPLETED:
         raise HTTPException(
             status_code=409,
@@ -167,16 +319,20 @@ def get_report(
                 "details": {"status": record.status.value},
             },
         )
-    markdown = service.get_report(analysis_id)
+    markdown = service.get_report(analysis_id, owner_id=user.user_id)
     if format == "json":
         return record.model_dump(mode="json")
     return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
 
 
 @router.get("/analyses/{analysis_id}/findings", tags=["analyses"])
-def get_findings(analysis_id: str, service: PaperPilotService = Depends(get_service)) -> dict:
+def get_findings(
+    analysis_id: str,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+) -> dict:
     """Structured findings and verification verdicts, for programmatic use."""
-    record = service.get_analysis(analysis_id)
+    record = service.get_analysis(analysis_id, owner_id=user.user_id)
     return {
         "analysis_id": record.analysis_id,
         "status": record.status.value,
@@ -194,10 +350,12 @@ _RESPONSE_FIELDS = {"response_markdown", "response_document"}
 
 @router.get("/analyses/{analysis_id}/responses", tags=["analyses"])
 def get_model_responses(
-    analysis_id: str, service: PaperPilotService = Depends(get_service)
+    analysis_id: str,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
 ) -> dict:
     """Each model answer as written (Markdown) and as its parsed response document."""
-    record = service.get_analysis(analysis_id)
+    record = service.get_analysis(analysis_id, owner_id=user.user_id)
     return {
         "analysis_id": record.analysis_id,
         "schema_version": SCHEMA_VERSION,
@@ -243,4 +401,5 @@ def register_error_handlers(app) -> None:
 
     @app.exception_handler(PaperPilotError)
     async def handle(request: Request, exc: PaperPilotError):  # noqa: ARG001
-        return JSONResponse(status_code=exc.http_status, content=exc.to_dict())
+        headers = {"Retry-After": str(exc.retry_after)} if isinstance(exc, RateLimitError) else None
+        return JSONResponse(status_code=exc.http_status, content=exc.to_dict(), headers=headers)
