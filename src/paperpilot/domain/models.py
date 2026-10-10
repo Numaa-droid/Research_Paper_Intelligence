@@ -501,6 +501,8 @@ class AnalysisRecord(StrictModel):
     errors: list[str] = Field(default_factory=list)
     report_path: str | None = None
     report_markdown: str | None = None
+    #: The two-page brief; absent on analyses made before briefs existed.
+    brief_markdown: str | None = None
     usage: list[AgentUsage] = Field(default_factory=list)
     duration_seconds: float | None = None
 

@@ -65,8 +65,8 @@ def report_html(markdown: str) -> str:
     return html
 
 
-def render_report_pdf(markdown: str, *, title: str | None = None) -> bytes:
-    """Lay the report out on A4 pages, with a footer and document metadata."""
+def render_report_pdf(markdown: str, *, title: str | None = None, kind: str = "report") -> bytes:
+    """Lay the report (or the brief, ``kind="brief"``) out on A4 pages, with a footer."""
     story = pymupdf.Story(html=report_html(markdown), user_css=_CSS)
     buffer = io.BytesIO()
     writer = pymupdf.DocumentWriter(buffer)
@@ -79,7 +79,7 @@ def render_report_pdf(markdown: str, *, title: str | None = None) -> bytes:
     writer.close()
 
     document = pymupdf.open("pdf", buffer.getvalue())
-    label = f"PaperMind report · {title}" if title else "PaperMind report"
+    label = f"PaperMind {kind} · {title}" if title else f"PaperMind {kind}"
     if len(label) > 90:
         label = label[:89] + "…"
     total = document.page_count
@@ -92,7 +92,7 @@ def render_report_pdf(markdown: str, *, title: str | None = None) -> bytes:
         page.insert_text((_PAGE.width - _MARGIN_X - width, y), counter, fontsize=7.5, color=(0.39, 0.45, 0.55))
     document.set_metadata(
         {
-            "title": title or "PaperMind report",
+            "title": title or f"PaperMind {kind}",
             "author": "PaperMind",
             "subject": "Citation-grounded research paper analysis",
             "creator": "PaperMind",

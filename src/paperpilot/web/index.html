@@ -460,6 +460,34 @@ details.banner button { position: absolute; right: 10px; top: 8px; }
 .mini-tl li { position: relative; color: var(--muted); overflow-wrap: anywhere; }
 .mini-tl li::before { content: ""; position: absolute; left: -17px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--accent)); box-shadow: 0 0 0 2px var(--panel-2); }
 .mini-tl b { color: var(--ink); font-weight: 600; }
+.hood-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.hood-h .linkish { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.hood-facts { margin: 0 0 6px; font-size: 12.5px; color: var(--muted); }
+.hood { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.hood-row a {
+  display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  padding: 6px 8px; margin-left: calc(var(--d, 0) * 18px); border-radius: 9px; text-decoration: none; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); transition: border-color .15s;
+}
+.hood-row a:hover { border-color: var(--accent); }
+.hood-row.bad a { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+.hood-row.run .hd { color: var(--accent); }
+.hk {
+  --c: var(--muted); justify-self: start; font: 700 9.5px var(--font); letter-spacing: .07em; text-transform: uppercase; color: var(--c);
+  padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.hk.k-llm { --c: var(--accent-2); } .hk.k-retriever { --c: #8b6cf0; } .hk.k-agent { --c: var(--accent); }
+.hk.k-node { --c: var(--info); } .hk.k-parser { --c: #d0568f; }
+.ht { min-width: 0; display: grid; }
+.ht b { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ht small { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ht small.he { color: var(--bad); white-space: normal; }
+.hd { font: 500 11.5px var(--mono); color: var(--muted); white-space: nowrap; }
+.hood-group { font-size: 11px; font-weight: 600; color: var(--faint); letter-spacing: .06em; text-transform: uppercase; margin: 6px 0 1px; }
+.hood-more { font-size: 12px; color: var(--muted); padding: 4px 2px; }
+.hood-answer { margin-top: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+.hood-answer summary { cursor: pointer; padding: 7px 10px; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+.hood-answer pre { margin: 0; padding: 8px 10px 10px; max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 12px/1.5 var(--mono); color: var(--ink); border-top: 1px solid var(--line); }
 .linkish { border: 0; background: none; padding: 0; color: var(--accent); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .linkish:hover { text-decoration: underline; }
 .overview-steps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 8px; counter-reset: s; }
@@ -592,6 +620,17 @@ details.banner button { position: absolute; right: 10px; top: 8px; }
 .empty { padding: 34px 10px; text-align: center; color: var(--faint); }
 
 /* report */
+.md.brief { max-width: 72ch; margin: 0 auto; }
+.md.brief h1 { font-size: 27px; margin-bottom: 6px; }
+.md.brief h1 + p { color: var(--muted); font-size: 14px; }
+.md.brief h2 { font-size: 19px; margin-top: 26px; padding-top: 14px; }
+.brief-more {
+  max-width: 72ch; margin: 26px auto 4px; padding: 16px 18px; border-radius: 14px; display: flex; flex-wrap: wrap;
+  align-items: center; justify-content: space-between; gap: 12px 18px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+.brief-more > div { flex: 1 1 300px; }
+.brief-more p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
 .report-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
 .report-bar .spacer { flex: 1; }
 .report-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 28px; }
@@ -999,6 +1038,7 @@ footer.foot a { color: var(--muted); }
 /* ============================================================ run view */
 .run-crumbs { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .run-crumbs a { text-decoration: none; }
+.run-crumbs-end { display: flex; align-items: center; gap: 14px; min-width: 0; }
 
 /* ============================================================ settings */
 .settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
@@ -1151,6 +1191,7 @@ footer.foot a { color: var(--muted); }
       <a href="#/library" data-nav="library"><svg viewBox="0 0 24 24"><path d="M4 5a1 1 0 0 1 1-1h4v16H5a1 1 0 0 1-1-1z"/><path d="M9 4h4v16H9z"/><path d="m14.5 5.2 3.8-1 3.4 14.6-3.8 1z"/></svg>Library<span class="count" id="navPapers" hidden></span></a>
       <a href="#/runs" data-nav="runs"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Runs<span class="count" id="navRuns" hidden></span></a>
       <p class="nav-label">Explore</p>
+      <a href="/tracing"><svg viewBox="0 0 24 24"><path d="M4 6h7M4 12h11M4 18h16"/><circle cx="15" cy="6" r="2"/><circle cx="19" cy="12" r="2"/></svg>Traces</a>
       <a href="#/run/demo" data-nav="demo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5 3.5-5 3.5z"/></svg>Demo run</a>
       <a href="/docs" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M8 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3"/><path d="m10 9-2 3 2 3M14 9l2 3-2 3"/></svg>API docs<svg class="ext" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 10 14"/></svg></a>
     </nav>
@@ -1304,7 +1345,7 @@ footer.foot a { color: var(--muted); }
 
       <!-- ---------------------------------------------------------- run -->
       <section class="view" data-view="run" hidden>
-        <div class="run-crumbs"><a class="linkish" href="#/runs">← All runs</a><span class="muted small" id="runId"></span></div>
+        <div class="run-crumbs"><a class="linkish" href="#/runs">← All runs</a><span class="run-crumbs-end"><span class="muted small" id="runId"></span><a class="linkish small" id="runTrace" href="/tracing" title="Every node, agent, retrieval and model call of this run" hidden>View trace →</a></span></div>
         <section class="card mission" id="mission" aria-labelledby="runTitle">
     <div class="mission-head">
       <div>
@@ -1322,6 +1363,9 @@ footer.foot a { color: var(--muted); }
         <button class="btn ghost sm" id="replay" hidden>
           <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Replay
         </button>
+        <a class="btn ghost sm" id="traceBtn" href="/tracing" target="_blank" rel="noopener" title="Every node, agent, retrieval and model call of this run" hidden>
+          <svg viewBox="0 0 24 24"><path d="M4 6h7M4 12h11M4 18h16"/><circle cx="15" cy="6" r="2"/><circle cx="19" cy="12" r="2"/></svg>Trace
+        </a>
       </div>
     </div>
     <div class="progress" aria-hidden="true"><i id="bar"></i></div>
@@ -1379,8 +1423,25 @@ footer.foot a { color: var(--muted); }
 
     <div class="card tabs-card">
       <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tabBtnBrief" aria-selected="false" aria-controls="tabBrief" data-tab="brief">Brief <span class="n">2 pages</span></button>
         <button class="tab" role="tab" id="tabBtnFindings" aria-selected="true" aria-controls="tabFindings" data-tab="findings">Findings <span class="n" id="findCount">0</span></button>
-        <button class="tab" role="tab" id="tabBtnReport" aria-selected="false" aria-controls="tabReport" data-tab="report">Report</button>
+        <button class="tab" role="tab" id="tabBtnReport" aria-selected="false" aria-controls="tabReport" data-tab="report">Full report</button>
+      </div>
+      <div class="tab-panel" id="tabBrief" role="tabpanel" aria-labelledby="tabBtnBrief" hidden>
+        <div class="report-bar">
+          <a class="btn primary sm" id="dlBriefPdf" href="#"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Download PDF</a>
+          <a class="btn ghost sm" id="dlBriefMd" href="#" download="paperpilot-brief.md">Markdown</a>
+          <span class="spacer"></span>
+          <button class="btn ghost sm" data-goto="report">Full report →</button>
+        </div>
+        <article class="md brief" id="briefBody"></article>
+        <div class="brief-more">
+          <div>
+            <b>Want the detail?</b>
+            <p>The full report walks through the method step by step, the mathematics, the datasets and setup, every result and ablation, a reproducibility checklist, and the evidence behind every statement.</p>
+          </div>
+          <button class="btn primary" data-goto="report">Read the full report</button>
+        </div>
       </div>
       <div class="tab-panel" id="tabFindings" role="tabpanel" aria-labelledby="tabBtnFindings">
         <div class="fx-toolbar">
@@ -1405,7 +1466,8 @@ footer.foot a { color: var(--muted); }
       <div class="tab-panel" id="tabReport" role="tabpanel" aria-labelledby="tabBtnReport" hidden>
         <div class="report-bar">
           <button class="btn ghost sm" id="copyReport"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>Copy Markdown</button>
-          <a class="btn ghost sm" id="dlReport" href="#" download="paperpilot-report.md"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Download</a>
+          <a class="btn ghost sm" id="dlReport" href="#" download="paperpilot-report.md"><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Download Markdown</a>
+          <a class="btn ghost sm" id="dlReportPdf" href="#" hidden><svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>Download PDF</a>
           <a class="btn ghost sm" id="rawReport" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>Open raw</a>
         </div>
         <div class="report-layout">
@@ -1772,6 +1834,7 @@ function makeRun(kind) {
     token: Symbol(kind), kind, id: null, title: "", seen: new Set(), queue: [], playing: false, played: [],
     firstAt: null, nodes: freshNodes(), selected: null, follow: true, backendDone: false, finished: false,
     data: null, facts: {}, fails: 0, progress: 0, file: null,
+    trace: null, traceAt: 0, traceLoading: false,
   };
 }
 let run = makeRun("idle");
@@ -1998,11 +2061,129 @@ function renderInspector() {
     ${kv.length ? `<dl class="kv">${kv.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
     ${extra}
     ${tl ? `<h4>Timeline</h4><ol class="mini-tl">${tl}</ol>` : ""}
+    ${hoodSection(key)}
     <p style="margin:12px 0 0;display:flex;gap:14px;flex-wrap:wrap">
       ${run.kind !== "idle" && !run.finished ? `<button class="linkish" data-follow>${run.follow ? "● Following live" : "Follow live activity"}</button>` : ""}
       <button class="linkish" data-overview>How a run works</button>
     </p>
   </div>`;
+}
+/* ---------- under the hood: the stage's steps, from the run's trace ---------- */
+const HOOD_KINDS = { llm: "LLM", retriever: "Search", agent: "Agent", parser: "Parse", tool: "Tool", node: "Node", chain: "Step" };
+/** Spans that make up one stage of the graph. */
+function stageSpans(t, key) {
+  const named = (...names) => t.spans.filter((s) => names.includes(s.name));
+  const nodes = (...names) => t.spans.filter((s) => s.kind === "node" && names.includes(s.name));
+  if (key.startsWith("agent:")) return t.spans.filter((s) => s.kind === "agent" && s.name === key.slice(6));
+  return ({
+    ingestion: () => named("parse_pdf", "chunk_document"),
+    indexing: () => named("build_index"),
+    planning: () => nodes("plan"),
+    aggregation: () => nodes("coverage", "aggregate"),
+    verification: () => named("verify_claim"),
+    retry: () => nodes("retry"),
+    report: () => nodes("synthesize"),
+  }[key] || (() => []))();
+}
+function indexTrace(t) {
+  const byId = new Map(t.spans.map((s) => [s.span_id, { ...s, kids: [] }]));
+  const spans = [...byId.values()];
+  for (const s of spans) byId.get(s.parent_id)?.kids.push(s);
+  return { ...t, spans, byId };
+}
+function subtree(s) { return [s, ...s.kids.flatMap(subtree)]; }
+async function loadTrace() {
+  const id = run.id;
+  if (!id || run.kind === "demo" || run.traceLoading) return;
+  if (run.trace && run.trace.status !== "running") return;
+  if (Date.now() - run.traceAt < 3000) return;
+  run.traceLoading = true;
+  try {
+    const t = await jget(`/analyses/${encodeURIComponent(id)}/trace`);
+    if (run.id === id) run.trace = indexTrace(t);
+  } catch {
+    if (run.id === id && !run.trace) run.trace = { missing: true };
+  } finally {
+    run.traceLoading = false;
+    run.traceAt = Date.now();
+  }
+  if (run.id !== id) return;
+  renderInspector();
+  // A long model call sends no progress events; keep the open stage fresh anyway.
+  if (run.trace?.status === "running") setTimeout(() => { if (run.id === id && run.selected) renderInspector(); }, 3200);
+}
+function hoodRow(t, s, depth = 0) {
+  const ms = s.duration_ms ?? (Date.now() / 1000 - s.start_time) * 1000;
+  let title = titleCase(s.name), sub = "";
+  if (s.kind === "llm") {
+    title = s.metadata.model || s.name;
+    sub = `${(s.metadata.prompt_tokens || 0).toLocaleString()} → ${(s.metadata.completion_tokens || 0).toLocaleString()} tokens`;
+  } else if (s.kind === "retriever") {
+    title = `“${s.inputs.query || ""}”`;
+    sub = s.outputs.documents ? `${s.outputs.documents.length} chunks` : "";
+  } else if (s.name === "verify_claim") {
+    title = s.inputs.claim || "claim";
+    sub = s.outputs.status ? titleCase(s.outputs.status) : "";
+  } else if (s.name === "retrieve_context") {
+    const q = s.kids.filter((k) => k.kind === "retriever").length;
+    title = "Retrieved context";
+    sub = `${q} ${q === 1 ? "query" : "queries"} → ${(s.outputs.sources || []).length} chunks shown to the model`;
+  } else {
+    sub = Object.entries(s.outputs || {}).filter(([, v]) => typeof v === "number" || (typeof v === "string" && v.length < 40))
+      .slice(0, 3).map(([k, v]) => `${titleCase(k).toLowerCase()} ${typeof v === "number" ? v.toLocaleString() : v}`).join(" · ");
+  }
+  const state = s.status === "error" ? "bad" : s.status === "running" ? "run" : "";
+  return `<li class="hood-row ${state}" style="--d:${depth}">
+    <a href="/tracing#${encodeURIComponent(t.trace_id)}/${encodeURIComponent(s.span_id)}" target="_blank" rel="noopener" title="Open this step in the trace viewer">
+      <span class="hk k-${s.kind}">${HOOD_KINDS[s.kind] || s.kind}</span>
+      <span class="ht"><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}${s.error ? `<small class="he">${esc(s.error.message)}</small>` : ""}</span>
+      <span class="hd">${s.status === "running" ? "running…" : fmtMs(ms)}</span>
+    </a></li>`;
+}
+function hoodSection(key) {
+  if (run.kind === "demo" || run.kind === "idle" || !run.id) return "";
+  loadTrace();
+  const t = run.trace;
+  if (!t) return `<h4>Under the hood</h4><p class="muted small">Loading this run's trace…</p>`;
+  if (t.missing) return `<h4>Under the hood</h4><p class="muted small">No trace was recorded for this run. Runs started before tracing was turned on have none.</p>`;
+  const roots = stageSpans(t, key);
+  const open = `<a class="linkish" href="/tracing#${encodeURIComponent(t.trace_id)}${roots[0] ? `/${encodeURIComponent(roots[0].span_id)}` : ""}" target="_blank" rel="noopener">Open in trace ↗</a>`;
+  if (!roots.length) {
+    return t.status === "running" && key !== "upload"
+      ? `<h4 class="hood-h">Under the hood ${open}</h4><p class="muted small">Not started yet.</p>` : "";
+  }
+  const all = roots.flatMap(subtree);
+  const llm = all.filter((s) => s.kind === "llm");
+  const tokens = llm.reduce((n, s) => n + (s.metadata.total_tokens || 0), 0);
+  const searches = all.filter((s) => s.kind === "retriever").length;
+  const facts = [
+    llm.length && `${llm.length} LLM call${llm.length === 1 ? "" : "s"}`,
+    tokens && `${tokens.toLocaleString()} tokens`,
+    searches && `${searches} search${searches === 1 ? "" : "es"}`,
+  ].filter(Boolean);
+
+  let rows = "";
+  if (key === "verification") {
+    rows = roots.slice(0, 14).map((s) => hoodRow(t, s)).join("")
+      + (roots.length > 14 ? `<li class="hood-more">and ${roots.length - 14} more claims in the trace</li>` : "");
+  } else {
+    for (const r of roots) {
+      const steps = key.startsWith("agent:") || r.kind === "node" ? r.kids : [r];
+      if (roots.length > 1 && key.startsWith("agent:")) rows += `<li class="hood-group">Attempt ${r.inputs.attempt ?? ""}</li>`;
+      for (const s of steps) {
+        rows += hoodRow(t, s);
+        if (s.name === "retrieve_context") rows += s.kids.filter((k) => k.kind === "retriever").slice(0, 6).map((k) => hoodRow(t, k, 1)).join("");
+        else if (s.kind === "agent") rows += s.kids.filter((k) => k.kind === "llm").map((k) => hoodRow(t, k, 1)).join("");
+      }
+    }
+  }
+  const answer = [...llm].reverse().find((s) => s.outputs?.message?.content);
+  const text = answer?.outputs.message.content || "";
+  const preview = text && !text.endsWith("chars not captured]")
+    ? `<details class="hood-answer"><summary>Model answer · ${text.length.toLocaleString()} chars</summary><pre>${esc(text.slice(0, 2500))}${text.length > 2500 ? "\n…" : ""}</pre></details>` : "";
+  return `<h4 class="hood-h">Under the hood ${open}</h4>
+    ${facts.length ? `<p class="hood-facts">${facts.join(" · ")}</p>` : ""}
+    <ol class="hood">${rows || `<li class="hood-more">No inner steps recorded.</li>`}</ol>${preview}`;
 }
 function selectNode(key, fromUser = true) {
   if (fromUser) run.follow = false;
@@ -2224,6 +2405,7 @@ async function poll(token) {
 async function finish(token) {
   if (run.finished || run.token !== token) return;
   run.finished = true;
+  run.traceAt = 0;  // fetch the finished trace on the next render
   if (speed !== "instant") await sleep(450);
   if (run.token !== token) return;
   stopTimer();
@@ -2248,13 +2430,15 @@ async function finish(token) {
   if (errors.length) {
     showRunAlert("warn", "Completed with problems: some findings are missing", errors, hintFor(errors));
   }
-  let findings = [], report = "";
+  let findings = [], report = "", brief = "";
   if (run.kind === "demo") {
-    findings = DEMO.findings; report = DEMO.report;
+    findings = DEMO.findings; report = DEMO.report; brief = DEMO.brief;
   } else {
-    const [f, r] = await Promise.allSettled([
+    const [f, r, b] = await Promise.allSettled([
       jget(`/analyses/${run.id}/findings`),
       api(`/analyses/${run.id}/report`).then(async (res) => { if (!res.ok) throw await apiError(res); return res.text(); }),
+      // Analyses from before briefs existed have none (404): show the rest as before.
+      data.brief_url ? api(data.brief_url).then((res) => (res.ok ? res.text() : "")) : Promise.resolve(""),
       jget(`/papers/${data.document_id}`).then((doc) => {
         const name = doc.title || doc.filename;
         if (name && run.token === token) { run.title = name; $("#runTitle").textContent = name; setCrumb(); }
@@ -2264,9 +2448,10 @@ async function finish(token) {
     else toast(`Could not load findings: ${f.reason.message}`, "warn");
     if (r.status === "fulfilled") report = r.value;
     else toast(`Could not load the report: ${r.reason.message}`, "warn");
+    if (b.status === "fulfilled") brief = b.value;
   }
   if (run.token !== token) return;
-  renderResults(data, findings, report);
+  renderResults(data, findings, report, brief);
   toast(run.kind === "demo" ? "Demo complete. Explore the findings below." : "Analysis complete.", "ok");
   setTimeout(() => {
     if (run.token === token) $("#results").scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "start" });
@@ -2393,7 +2578,7 @@ const STATUS_ORDER = Object.keys(STATUS_META);
 const PAGE_SIZE = 20;
 const fx = { status: "all", agent: "all", q: "", sort: "impact", items: [], limit: PAGE_SIZE };
 
-function renderResults(data, findings, report) {
+function renderResults(data, findings, report, brief = "") {
   $("#results").hidden = false;
   const counts = {};
   for (const f of findings) counts[f.status] = (counts[f.status] || 0) + 1;
@@ -2430,7 +2615,9 @@ function renderResults(data, findings, report) {
   $("#findCount").textContent = total;
   renderFindings();
   renderReport(report);
-  showTab("findings");
+  renderBrief(brief);
+  // The brief is what to read first; without one, the findings are.
+  showTab(brief ? "brief" : "findings");
 }
 
 function highlight(text, q) {
@@ -2551,9 +2738,15 @@ $("#legend").addEventListener("click", (e) => {
 
 function showTab(name) {
   $$(".tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+  $("#tabBrief").hidden = name !== "brief";
   $("#tabFindings").hidden = name !== "findings";
   $("#tabReport").hidden = name !== "report";
 }
+$("#tabBrief").addEventListener("click", (e) => {
+  if (!e.target.closest("[data-goto]")) return;
+  showTab("report");
+  $(".tabs-card").scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "start" });
+});
 $(".tabs").addEventListener("click", (e) => { const t = e.target.closest("[data-tab]"); if (t) showTab(t.dataset.tab); });
 $(".tabs").addEventListener("keydown", (e) => {
   if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -2635,6 +2828,21 @@ function markdown(src) {
   return { html: out.join("\n"), toc };
 }
 
+let briefUrl = null;
+function renderBrief(md) {
+  $("#tabBtnBrief").hidden = !md;
+  if (!md) return;
+  // The closing "need more?" paragraph is for print; on screen the button below says it.
+  const onScreen = md.replace(/\n---\n+_Need more\?[\s\S]*$/, "\n");
+  $("#briefBody").innerHTML = markdown(onScreen).html;
+  if (briefUrl) URL.revokeObjectURL(briefUrl);
+  briefUrl = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+  $("#dlBriefMd").href = briefUrl;
+  $("#dlBriefMd").download = `paperpilot-${run.id || "demo"}-brief.md`;
+  $("#dlBriefPdf").hidden = !run.id;
+  if (run.id) $("#dlBriefPdf").href = `/analyses/${run.id}/brief?format=pdf`;
+}
+
 let reportUrl = null, spy = null;
 function renderReport(md) {
   const { html, toc } = markdown(md);
@@ -2644,7 +2852,8 @@ function renderReport(md) {
   reportUrl = URL.createObjectURL(new Blob([md || ""], { type: "text/markdown" }));
   $("#dlReport").href = reportUrl;
   $("#dlReport").download = `paperpilot-${run.id || "demo"}.md`;
-  $("#rawReport").hidden = !run.id;
+  $("#rawReport").hidden = $("#dlReportPdf").hidden = !run.id;
+  if (run.id) $("#dlReportPdf").href = `/analyses/${run.id}/report?format=pdf`;
   if (run.id) $("#rawReport").href = `/analyses/${run.id}/report`;
   $("#copyReport").onclick = async () => {
     try { await navigator.clipboard.writeText(md); toast("Report copied to the clipboard.", "ok"); }
@@ -2788,6 +2997,54 @@ const DEMO = {
       explanation: "Plausible from the setup description, but not stated explicitly.", verification_note: "Labelled as an inference: the setup mentions validation tuning but not λ specifically.",
       evidence: [ev(4, "4.1 Setup", "Hyperparameters were selected on the validation partition.", "approximate")] },
   ],
+  brief: `# Sparse Routing Transformers for Long-Document Question Answering
+
+A. Researcher, B. Scientist, C. Engineer · 6 pages
+
+> **PaperMind brief:** the paper in two pages. Every statement below comes from the paper and was checked against it; \`[p. N]\` marks where to read more. The full report has the method, setup, every result and all the evidence.
+
+## In short
+
+The paper introduces **Sparse Routing Transformers (SRT)**, which learn which blocks of a long document deserve full attention instead of using a fixed pattern. SRT-Large improves over the dense baseline by 5.2 F1 on NarrativeQA while using 3.1x fewer attention FLOPs. [p. 1, §Abstract]
+
+## The problem
+
+Long-document question answering needs reasoning over inputs far longer than the context windows most encoders were trained on. [p. 1, §1 Introduction]
+
+**Why it matters.** Models such as Longformer and BigBird impose fixed local and global attention patterns, so most compute goes on context that is irrelevant to the question. [p. 1, §1 Introduction]
+
+## What the paper does
+
+**How it works, step by step:**
+
+1. **Split** — the document is cut into blocks of 128 tokens. [p. 3, §3 Method]
+2. **Route** — a lightweight router scores every block. [p. 3, §3 Method]
+3. **Attend** — the top-scoring blocks get full attention; the rest get a cheap pooled summary. [p. 2, §3 Method]
+4. **Train** — the reader loss is combined with a load-balancing term so the router does not collapse onto a few blocks. [p. 3, §3.1 Routing Objective]
+
+## What it found
+
+| System | Metric | Value | Where |
+| --- | --- | --- | --- |
+| SRT-Large | NarrativeQA F1 | **81.4** ★ | [p. 4, §4.2 Main Results, Table 1] |
+| Longformer-Large | NarrativeQA F1 | **77.9** | [p. 4, §4.2 Main Results, Table 1] |
+| Dense-Large | NarrativeQA F1 | **76.2** | [p. 4, §4.2 Main Results, Table 1] |
+
+_★ the paper's best result._
+
+## Key takeaways
+
+- Learning where to attend beats fixed sparse patterns: +3.5 F1 over Longformer-Large. [p. 4, §4.2 Main Results]
+- The load-balancing loss matters: removing it drops F1 from 81.4 to 78.8. [p. 5, §4.3 Ablations]
+- The gain is for long inputs: under 2k tokens SRT is within 0.3 F1 of the dense baseline. [p. 5, §5 Limitations]
+
+## How far to trust it
+
+- **Independent check:** 10 of 11 high-impact claims were upheld when re-checked against the paper.
+- **Limitations the authors state:** English-only data, and a single random seed per configuration. [p. 5, §5 Limitations]
+- **Not confirmed:** 2 statements produced during the analysis could not be grounded in the paper and are left out of this brief. The full report lists them, so you can see what not to rely on.
+- **Scope:** this reads only the PDF. It cannot tell whether the authors are right about the world, only what the paper says and where.
+`,
   report: `# PaperMind Report
 
 **Paper:** Sparse Routing Transformers for Long-Document Question Answering
@@ -3313,6 +3570,8 @@ function setCrumb() {
   if (view === "run") {
     crumb.innerHTML = `${run.kind === "demo" ? "Demo" : "Runs"}<span>/</span>${esc(run.title || "Run")}`;
     $("#runId").textContent = run.kind === "demo" ? "simulated events, no model calls" : run.id || "";
+    $("#runTrace").hidden = $("#traceBtn").hidden = run.kind === "demo" || !run.id;
+    if (run.id) $("#runTrace").href = $("#traceBtn").href = `/tracing#${encodeURIComponent(run.id)}`;
   } else {
     crumb.textContent = VIEW_TITLE[view] || "";
   }

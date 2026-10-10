@@ -36,9 +36,11 @@ from ..ingestion.service import IngestionService
 from ..observability import info, warning
 from ..providers.embeddings import EmbeddingProvider
 from ..providers.llm import LLMProvider
+from ..reporting.brief import BriefSynthesizer
 from ..reporting.synthesizer import ReportSynthesizer
 from ..retrieval.index import PaperIndex
 from ..retrieval.retriever import build_retriever
+from ..tracing.llm import traced_llm
 from ..validation.consistency import annotate_conflicts
 from ..validation.dedupe import merge_duplicate_findings
 from ..validation.reconcile import reconcile_findings
@@ -90,6 +92,9 @@ class AnalysisWorkflow:
     """Builds and runs the analysis graph for one paper."""
 
     def __init__(self, resources: WorkflowResources) -> None:
+        # Every model call any node makes goes through this provider, so this is
+        # the one place that puts them all in the run's trace.
+        resources.llm = traced_llm(resources.llm)
         self.res = resources
         self.graph = self._build()
 
@@ -539,9 +544,26 @@ class AnalysisWorkflow:
             usage=state.get("usage", []),
             retry_count=int(state.get("retry_count", 0)),
         )
-        recorder.completed("report", f"Report written ({len(report)} characters)")
+        brief = ""
+        try:
+            brief = BriefSynthesizer().synthesize(
+                metadata=state["paper_metadata"],
+                index=self.res.index,
+                plan=state.get("analysis_plan"),
+                agent_results=state.get("agent_results", {}),
+                findings=state.get("findings", []),
+                verification_results=state.get("verification_results", []),
+            )
+        except Exception as exc:  # noqa: BLE001 - the full report still stands without it
+            warning("report.brief_failed", error_type=type(exc).__name__, error=str(exc)[:300])
+        recorder.completed(
+            "report",
+            f"Report written ({len(report)} characters)"
+            + (f", with a {len(brief.split())}-word brief" if brief else ""),
+        )
         return ResearchState(
             final_report=report,
+            final_brief=brief,
             status=AnalysisStatus.COMPLETED,
             errors=errors,
             events=recorder.drain(),

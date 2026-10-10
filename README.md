@@ -234,12 +234,16 @@ GET  /analyses/{analysis_id}/findings structured findings + verification
 GET  /analyses/{analysis_id}/responses every model answer: Markdown + parsed JSON document
 GET  /schemas/response-document       JSON Schema of the parsed model answer
 GET  /analyses                        your analyses, newest first, with headline numbers
+GET  /traces                          your run traces, newest first (running ones included)
+GET  /traces/{trace_id}               one run: every span with inputs, outputs, tokens, timing
+GET  /analyses/{analysis_id}/trace    the latest trace of an analysis
 POST /auth/signup | /auth/login       create an account / sign in (sets the session cookie)
 POST /auth/logout                     end the session
 GET  /auth/me                         the signed-in account
 POST /auth/password                   change password (signs out other sessions)
 GET  /health                          liveness and configuration
 GET  /                                minimal web UI
+GET  /tracing                         trace viewer
 ```
 
 ```bash
@@ -254,7 +258,7 @@ curl -sH "$AUTH" localhost:8000/analyses/$AID | jq '{status, progress, stage}'
 curl -sH "$AUTH" localhost:8000/analyses/$AID/report
 ```
 
-Every endpoint except `/`, `/health`, the API docs and `/auth/*` needs a
+Every endpoint except `/`, `/tracing`, `/health`, the API docs and `/auth/*` needs a
 signed-in account: the web UI uses an HttpOnly session cookie, scripts send the
 token from `/auth/login` as `Authorization: Bearer <token>`. Each account sees
 only its own papers and analyses; the first account created inherits anything
@@ -606,6 +610,46 @@ Agent traces record the **agent name, prompt version, model, provider, attempt,
 token usage and latency**, so a change in output quality can be attributed to a
 prompt change rather than guessed at.
 
+### Run tracing (`/tracing`)
+
+A self-hosted alternative to LangSmith: every analysis is recorded as a tree of
+spans and shown in a trace viewer at **`/tracing`** (also linked from the
+sidebar, and as *View trace* on every run). Nothing leaves the machine.
+
+| Span kind   | What it records |
+|-------------|-----------------|
+| `chain`     | the run itself (paper, model, final status), and each agent's context assembly |
+| `node`      | every graph node, in execution order, with what it wrote to the state; parallel groups contain their members |
+| `agent`     | each specialist and each verified claim: inputs (attempt, retry feedback), findings out |
+| `retriever` | every search query with the ranked chunks it returned (page, section, scores, text) |
+| `llm`       | every model call: system and user prompt, the answer, tokens, latency, estimated cost |
+| `parser` / `tool` | Markdown parsing, evidence validation, PDF parsing, chunking, indexing |
+
+Routing decisions (`verify → retry`) and every INFO-or-louder log line are kept
+as events on the span that was open when they happened. A running analysis is
+traceable live: the viewer polls and shows steps still in flight.
+
+The viewer opens on a **runs overview**: headline numbers, a chart of latency,
+tokens, LLM calls, cost or errors per run, and a runs table with each run's
+input, output, latency, tokens and cost. Opening a run shows its **timeline**
+(span tree beside a waterfall of when each step ran), its **agent flow** (the
+graph as it actually executed, with a per-agent breakdown of time, calls and
+tokens), and an inspector with a step's input, output, metadata, events and
+error. Traces download as JSON, and `/tracing#<trace_id>/<span_id>` links to one step.
+
+The run page shows the same data in place: click any stage of the graph and its
+inspector lists what happened **under the hood** — each search query and the
+chunks it returned, each model call with its tokens, parsing and validation,
+every verified claim — with the model's answer, and links to that step in the
+trace viewer. The **Trace** button beside *Replay* opens the whole run.
+
+Traces are stored in `<data_dir>/traces.sqlite`, the newest
+`PAPERPILOT_TRACING_RETENTION` (default 200) kept. They contain paper text
+(prompts and retrieved passages); `PAPERPILOT_TRACING_CAPTURE_CONTENT=false`
+keeps only their sizes. `PAPERPILOT_TRACING_ENABLED=false` turns tracing off.
+To trace your own code, wrap it in `paperpilot.tracing.span(name, kind=...)`;
+outside a run it does nothing.
+
 ---
 
 ## Repository layout
@@ -624,6 +668,7 @@ src/paperpilot/
 ├── response/         Markdown model answers -> deterministic response-document JSON
 ├── retrieval/        BM25, vectors, the paper index, hybrid retriever
 ├── storage/          Repository interfaces, SQLite, local files
+├── tracing/          Span tracer, trace store, traced LLM provider
 ├── validation/       Quote matching, numeric checks, schema coercion
 ├── cli.py            Command-line interface
 └── service.py        Application service

@@ -52,6 +52,8 @@ class ResearchState(TypedDict, total=False):
 
     # Outputs and observability
     final_report: str
+    #: The two-page brief read before the full report.
+    final_brief: str
     events: list[ProgressEvent]
     usage: list[AgentUsage]
     errors: list[str]
@@ -73,6 +75,7 @@ def new_state(analysis_id: str, document_id: str, file_path: str) -> ResearchSta
         retry_targets=[],
         status=AnalysisStatus.PENDING,
         final_report="",
+        final_brief="",
         events=[],
         usage=[],
         errors=[],

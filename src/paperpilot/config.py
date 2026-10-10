@@ -152,6 +152,16 @@ class Settings(BaseSettings):
     log_http: Literal["changes", "errors", "all", "none"] = "changes"
     log_document_text: bool = False
 
+    # --- Tracing ----------------------------------------------------------
+    #: Record every run as a tree of spans (nodes, agents, retrievals, model
+    #: calls) viewable at ``/tracing``. Stored locally in ``traces.sqlite``.
+    tracing_enabled: bool = True
+    #: Keep prompts, model answers and retrieved passages in traces. Off keeps
+    #: only their sizes, for deployments where paper text must not be stored twice.
+    tracing_capture_content: bool = True
+    #: Most recent traces kept; older ones are deleted. 0 keeps every trace.
+    tracing_retention: int = Field(default=200, ge=0)
+
     @field_validator("llm_reasoning_effort", "llm_seed", mode="before")
     @classmethod
     def _blank_reasoning_effort_is_unset(cls, v):
@@ -204,6 +214,10 @@ class Settings(BaseSettings):
     @property
     def report_dir(self) -> Path:
         return self.data_dir / "reports"
+
+    @property
+    def trace_db_path(self) -> Path:
+        return self.data_dir / "traces.sqlite"
 
     @property
     def sqlite_path(self) -> Path:

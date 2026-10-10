@@ -157,6 +157,10 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(report, encoding="utf-8")
         print(f"\nReport written to {output}", file=sys.stderr)
+        if record.brief_markdown:
+            brief = output.with_name(f"{output.stem}.brief{output.suffix or '.md'}")
+            brief.write_text(record.brief_markdown, encoding="utf-8")
+            print(f"Two-page brief written to {brief}", file=sys.stderr)
     else:
         print(report)
 

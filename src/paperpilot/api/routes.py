@@ -10,7 +10,13 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from .. import __version__
 from ..accounts import MIN_PASSWORD, SESSION_DAYS
 from ..domain.enums import AnalysisStatus
-from ..errors import AuthenticationError, PaperPilotError, RateLimitError, UnsupportedFileError
+from ..errors import (
+    AuthenticationError,
+    NotFoundError,
+    PaperPilotError,
+    RateLimitError,
+    UnsupportedFileError,
+)
 from ..observability import info
 from ..response import SCHEMA_VERSION, response_document_json_schema
 from ..service import PaperPilotService
@@ -322,7 +328,56 @@ def get_report(
     markdown = service.get_report(analysis_id, owner_id=user.user_id)
     if format == "json":
         return record.model_dump(mode="json")
+    if format == "pdf":
+        return _pdf_response(service, record, markdown, kind="report")
     return PlainTextResponse(markdown, media_type="text/markdown; charset=utf-8")
+
+
+@router.get("/analyses/{analysis_id}/brief", tags=["analyses"])
+def get_brief(
+    analysis_id: str,
+    format: str = "markdown",
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+):
+    """The two-page brief: what to read before the full report.
+
+    ``format=pdf`` returns it as a PDF. Analyses made before briefs existed have
+    none (``404``); their full report is unaffected.
+    """
+    record = service.get_analysis(analysis_id, owner_id=user.user_id)
+    if record.status is not AnalysisStatus.COMPLETED:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "report_not_ready",
+                "message": f"analysis is '{record.status.value}', not completed",
+                "details": {"status": record.status.value},
+            },
+        )
+    if not record.brief_markdown:
+        raise NotFoundError(
+            f"analysis '{analysis_id}' has no brief; it was made before briefs existed. "
+            "Run the paper again to get one."
+        )
+    if format == "pdf":
+        return _pdf_response(service, record, record.brief_markdown, kind="brief")
+    return PlainTextResponse(record.brief_markdown, media_type="text/markdown; charset=utf-8")
+
+
+def _pdf_response(service: PaperPilotService, record, markdown: str, *, kind: str) -> Response:
+    from ..reporting.pdf import render_report_pdf, report_filename
+
+    metadata = service.documents.get(record.document_id)
+    title = (metadata.title or metadata.filename) if metadata else None
+    filename = report_filename(record.analysis_id, title)
+    if kind == "brief":
+        filename = filename.removesuffix(".pdf") + "-brief.pdf"
+    return Response(
+        render_report_pdf(markdown, title=title, kind=kind),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/analyses/{analysis_id}/findings", tags=["analyses"])
@@ -378,6 +433,51 @@ def get_model_responses(
             for v in record.verification_results
         ],
     }
+
+
+# --- traces ------------------------------------------------------------------
+
+
+@router.get("/traces", tags=["traces"])
+def list_traces(
+    limit: int = 50,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+) -> list[dict]:
+    """The account's run traces, newest first, with headline numbers for each."""
+    return service.list_traces(owner_id=user.user_id, limit=min(max(limit, 1), 200))
+
+
+@router.get("/traces/{trace_id}", tags=["traces"])
+def get_trace(
+    trace_id: str,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+) -> dict:
+    """One run: every span with its inputs, outputs, timing, tokens and events.
+
+    A running trace is returned as it stands, so polling shows it grow.
+    """
+    return service.get_trace(trace_id, owner_id=user.user_id)
+
+
+@router.get("/analyses/{analysis_id}/trace", tags=["traces"])
+def get_analysis_trace(
+    analysis_id: str,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+) -> dict:
+    """The most recent trace of an analysis."""
+    return service.trace_for_analysis(analysis_id, owner_id=user.user_id)
+
+
+@router.get("/tracing", response_class=HTMLResponse, include_in_schema=False)
+def tracing_page() -> HTMLResponse:
+    """Trace viewer: how the agents worked through a run, step by step."""
+    page = _WEB_DIR / "traces.html"
+    if not page.exists():
+        return HTMLResponse("<h1>Traces</h1><p>UI asset missing. API is at /traces.</p>")
+    return HTMLResponse(page.read_text(encoding="utf-8"))
 
 
 @router.get("/schemas/response-document", tags=["system"])

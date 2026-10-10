@@ -86,6 +86,7 @@ class AnalysisResponse(BaseModel):
     errors: list[str] = Field(default_factory=list)
     events: list[ProgressEventResponse] = Field(default_factory=list)
     report_url: str | None = None
+    brief_url: str | None = None
 
     @classmethod
     def from_record(cls, record: AnalysisRecord) -> AnalysisResponse:
@@ -129,6 +130,11 @@ class AnalysisResponse(BaseModel):
             report_url=(
                 f"/analyses/{record.analysis_id}/report"
                 if record.status is AnalysisStatus.COMPLETED
+                else None
+            ),
+            brief_url=(
+                f"/analyses/{record.analysis_id}/brief"
+                if record.status is AnalysisStatus.COMPLETED and record.brief_markdown
                 else None
             ),
         )

@@ -160,20 +160,7 @@ class ReportSynthesizer:
         usage: list[AgentUsage] | None = None,
         retry_count: int = 0,
     ) -> str:
-        self._vocabulary = PaperVocabulary(index)
-        self._numbers = PaperNumbers(index)
-        self._number_flags: list[str] = []
-        self._coverage = PaperCoverage(index)
-        self._symbols = SymbolDefinitions(index)
-        self._absence_fixes: list[str] = []
-        self._index = index
-        self._amap: AttributionMap = attribution_map(index)
-        self._kind = plan.paper_kind if plan else "empirical"
-        # Findings folded into another as duplicates stay in their agent's
-        # result but are no longer part of the analysis; each live finding is
-        # printed once across the narrative sections.
-        self._live = {id(f) for f in findings}
-        self._rendered: set[int] = set()
+        self._prepare(index=index, plan=plan, findings=findings)
         sections: list[str] = [
             self._header(metadata),
             self._executive_summary(agent_results, findings),
@@ -196,6 +183,23 @@ class ReportSynthesizer:
             sections.append(self._evidence_appendix(findings, verification_results))
         sections.append(self._footer(metadata, index))
         return "\n\n".join(s for s in sections if s and s.strip()) + "\n"
+
+    def _prepare(self, *, index: PaperIndex, plan: AnalysisPlan | None, findings: list[Finding]) -> None:
+        """The paper-wide checks every section's prose is run through."""
+        self._vocabulary = PaperVocabulary(index)
+        self._numbers = PaperNumbers(index)
+        self._number_flags: list[str] = []
+        self._coverage = PaperCoverage(index)
+        self._symbols = SymbolDefinitions(index)
+        self._absence_fixes: list[str] = []
+        self._index = index
+        self._amap: AttributionMap = attribution_map(index)
+        self._kind = plan.paper_kind if plan else "empirical"
+        # Findings folded into another as duplicates stay in their agent's
+        # result but are no longer part of the analysis; each live finding is
+        # printed once across the narrative sections.
+        self._live = {id(f) for f in findings}
+        self._rendered: set[int] = set()
 
     # --- sections ---------------------------------------------------------
 

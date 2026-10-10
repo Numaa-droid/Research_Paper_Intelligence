@@ -32,6 +32,8 @@ from .storage.factory import build_repositories
 from .storage.files import LocalFileStorage
 from .storage.repository import AnalysisRepository, DocumentRepository, FileStorage, UserRepository
 from .storage.sqlite_repo import InMemoryUserRepository
+from .tracing import Tracer
+from .tracing.store import SQLiteTraceStore
 
 
 def new_analysis_id() -> str:
@@ -70,6 +72,13 @@ class PaperPilotService:
         self.accounts = AccountService(users, documents, settings=self.settings)
         self.files = files or LocalFileStorage(
             upload_dir=self.settings.upload_dir, report_dir=self.settings.report_dir
+        )
+        self.tracer = Tracer(
+            SQLiteTraceStore(self.settings.trace_db_path, retention=self.settings.tracing_retention)
+            if self.settings.tracing_enabled
+            else None,
+            enabled=self.settings.tracing_enabled,
+            capture_content=self.settings.tracing_capture_content,
         )
         self.llm = llm_provider or build_llm_provider(self.settings)
         self.embedder = embedding_provider or build_embedding_provider(self.settings)
@@ -228,15 +237,41 @@ class PaperPilotService:
             file_path=str(file_path),
         )
 
+        paper = file_path.name.split("__", 1)[-1]
+        llm_model = None if self.settings.llm_provider == "mock" else self.settings.llm_model
         try:
-            with log_context(analysis_id=analysis_id, document_id=record.document_id):
+            with log_context(analysis_id=analysis_id, document_id=record.document_id), \
+                    self.tracer.trace(
+                        "analysis",
+                        analysis_id=analysis_id,
+                        document_id=record.document_id,
+                        inputs={"paper": paper, "document_id": record.document_id},
+                        metadata={
+                            "llm_provider": self.settings.llm_provider,
+                            "llm_model": self.llm.model,
+                            "embedding_provider": self.settings.embedding_provider,
+                            "parallel_agents": self.settings.parallel_agents,
+                            "max_retries": self.settings.max_retries,
+                        },
+                    ) as root:
                 info(
                     "service.analysis_started",
-                    paper=file_path.name.split("__", 1)[-1],
+                    paper=paper,
                     llm_provider=self.settings.llm_provider,
-                    llm_model=None if self.settings.llm_provider == "mock" else self.settings.llm_model,
+                    llm_model=llm_model,
                 )
                 final = workflow.run(state)
+                status = final.get("status", AnalysisStatus.FAILED)
+                root.set_outputs(
+                    status=getattr(status, "value", status),
+                    findings=len(final.get("findings", [])),
+                    verified_claims=len(final.get("verification_results", [])),
+                    retries=int(final.get("retry_count", 0)),
+                    errors=final.get("errors", []),
+                    report_chars=len(final.get("final_report") or ""),
+                )
+                if status is AnalysisStatus.FAILED:
+                    root.fail("; ".join(final.get("errors", [])) or "the analysis failed")
             return self._persist(record, final, started)
         finally:
             with self._lock:
@@ -249,6 +284,39 @@ class PaperPilotService:
         metadata = self.register_local_file(file_path)
         record = self.create_analysis(metadata.document_id)
         return self.run_analysis(record.analysis_id, event_sink=event_sink)
+
+    # --- traces -----------------------------------------------------------
+
+    def list_traces(self, *, owner_id: str | None = None, limit: int = 50) -> list[dict]:
+        """Run traces of the account's analyses, running ones included, newest first."""
+        analysis_ids = (
+            None
+            if owner_id is None
+            else [r.analysis_id for r in self.list_analyses(owner_id=owner_id, limit=1000)]
+        )
+        return self.tracer.list(analysis_ids=analysis_ids, limit=limit)
+
+    def get_trace(self, trace_id: str, *, owner_id: str | None = None) -> dict:
+        """One trace with every span; another account's trace is reported as unknown."""
+        trace = self.tracer.get(trace_id)
+        if trace is None:
+            raise NotFoundError(f"unknown trace: {trace_id}")
+        if owner_id is not None:
+            if not trace.get("analysis_id"):
+                raise NotFoundError(f"unknown trace: {trace_id}")
+            try:
+                self.get_analysis(trace["analysis_id"], owner_id=owner_id)
+            except NotFoundError:
+                raise NotFoundError(f"unknown trace: {trace_id}") from None
+        return trace
+
+    def trace_for_analysis(self, analysis_id: str, *, owner_id: str | None = None) -> dict:
+        """The most recent trace of an analysis."""
+        self.get_analysis(analysis_id, owner_id=owner_id)
+        trace = self.tracer.latest_for_analysis(analysis_id)
+        if trace is None:
+            raise NotFoundError(f"analysis '{analysis_id}' has no trace")
+        return trace
 
     # --- internals --------------------------------------------------------
 
@@ -274,6 +342,7 @@ class PaperPilotService:
                 path = self.files.save_report(record.analysis_id, report)
                 info("report.saved", analysis_id=record.analysis_id, path=str(path), chars=len(report))
                 record.report_markdown = report
+                record.brief_markdown = state.get("final_brief") or None
                 record.report_path = str(path)
                 record.completed_at = datetime.now(UTC)
                 record.status = AnalysisStatus.COMPLETED
