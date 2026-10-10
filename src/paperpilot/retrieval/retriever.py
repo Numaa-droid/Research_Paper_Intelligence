@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from ..domain.enums import ElementType
 from ..domain.models import PaperChunk
 from ..observability import debug
+from ..tracing import span
 from .index import PaperIndex
 
 #: Reciprocal-rank-fusion constant. 60 is the value from the original RRF paper
@@ -137,6 +138,39 @@ class HybridRetriever(Retriever):
     # --- public API -------------------------------------------------------
 
     def search(self, query: RetrievalQuery) -> list[RetrievalResult]:
+        with span(
+            "retrieval",
+            kind="retriever",
+            inputs={
+                "query": query.text,
+                "mode": query.mode,
+                "top_k": query.top_k or self.default_top_k,
+                "sections": query.sections,
+                "pages": query.pages,
+                "element_types": [t.value for t in query.element_types or []],
+            },
+            metadata={"reranker": getattr(self.reranker, "name", None)},
+        ) as s:
+            results = self._search(query)
+            s.set_outputs(
+                documents=[
+                    {
+                        "chunk_id": r.chunk_id,
+                        "page": r.chunk.page,
+                        "section": r.chunk.citation_section,
+                        "element_type": r.chunk.element_type.value,
+                        "score": round(r.score, 6),
+                        "dense_rank": r.dense_rank,
+                        "lexical_rank": r.lexical_rank,
+                        "matched_by": r.matched_by,
+                        "text": s.content(r.chunk.text),
+                    }
+                    for r in results
+                ]
+            )
+            return results
+
+    def _search(self, query: RetrievalQuery) -> list[RetrievalResult]:
         top_k = query.top_k or self.default_top_k
         pool = max(top_k * self.candidate_multiplier, top_k)
 

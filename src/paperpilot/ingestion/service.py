@@ -13,6 +13,7 @@ from ..domain.models import PaperChunk, PaperMetadata
 from ..observability import info, timed
 from ..providers.embeddings import EmbeddingProvider
 from ..retrieval.index import PaperIndex
+from ..tracing import span
 from .chunker import chunk_document, element_counts
 from .layout import LayoutEngine, build_layout_engine
 from .ocr import OCREngine, build_ocr_engine
@@ -109,30 +110,59 @@ class IngestionService:
         document_id = document_id or new_document_id()
 
         with timed("ingestion", document_id=document_id, filename=path.name):
-            parsed = parse_pdf(
-                path,
-                ocr_engine=self.ocr_engine if self.ocr_engine.available else None,
-                ocr_min_chars=self.settings.ocr_min_chars_per_page,
-                max_bytes=self.settings.max_upload_bytes,
-                figure_ocr=self.settings.ocr_figures_enabled,
-                table_ocr=self.settings.ocr_tables_enabled,
-                layout_engine=self.layout_engine if self.layout_engine.available else None,
-            )
-            chunks, sections = chunk_document(
-                parsed,
-                document_id=document_id,
-                max_chars=self.settings.chunk_max_chars,
-                overlap=self.settings.chunk_overlap_chars,
-            )
+            with span(
+                "parse_pdf",
+                kind="tool",
+                inputs={"file": path.name},
+                metadata={
+                    "ocr": self.ocr_engine.available,
+                    "layout": self.layout_engine.available,
+                },
+            ) as s:
+                parsed = parse_pdf(
+                    path,
+                    ocr_engine=self.ocr_engine if self.ocr_engine.available else None,
+                    ocr_min_chars=self.settings.ocr_min_chars_per_page,
+                    max_bytes=self.settings.max_upload_bytes,
+                    figure_ocr=self.settings.ocr_figures_enabled,
+                    table_ocr=self.settings.ocr_tables_enabled,
+                    layout_engine=self.layout_engine if self.layout_engine.available else None,
+                )
+                s.set_outputs(pages=parsed.page_count)
+            with span(
+                "chunk_document",
+                kind="tool",
+                inputs={
+                    "max_chars": self.settings.chunk_max_chars,
+                    "overlap": self.settings.chunk_overlap_chars,
+                },
+            ) as s:
+                chunks, sections = chunk_document(
+                    parsed,
+                    document_id=document_id,
+                    max_chars=self.settings.chunk_max_chars,
+                    overlap=self.settings.chunk_overlap_chars,
+                )
+                s.set_outputs(chunks=len(chunks), sections=sections)
             metadata = build_metadata(
                 document_id=document_id, parsed=parsed, chunks=chunks, sections=sections
             )
-            index = PaperIndex.build(
-                document_id=document_id,
-                metadata=metadata,
-                chunks=chunks,
-                embedder=self.embedder,
-            )
+            with span(
+                "build_index",
+                kind="tool",
+                inputs={"chunks": len(chunks)},
+                metadata={"embedder": type(self.embedder).__name__},
+            ) as s:
+                index = PaperIndex.build(
+                    document_id=document_id,
+                    metadata=metadata,
+                    chunks=chunks,
+                    embedder=self.embedder,
+                )
+                s.set_outputs(
+                    lexical=index.bm25.size,
+                    dense=index.vectors.size if index.vectors else 0,
+                )
 
         info(
             "ingestion.summary",

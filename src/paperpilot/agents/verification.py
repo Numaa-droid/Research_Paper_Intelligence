@@ -34,6 +34,7 @@ from ..response import parse_markdown
 from ..response.reader import DocumentReader, clean_text, parse_score, section_blocks
 from ..response.schema import ListBlock, MathBlock, ParagraphBlock
 from ..retrieval.retriever import RetrievalQuery, RetrievalResult
+from ..tracing import span
 from ..validation.evidence import validate_evidence
 from ..validation.numeric import check_claim_numbers, extract_numbers, numeric_accuracy
 from .base import AgentContext, evidence_payload, format_context, format_metadata
@@ -158,6 +159,29 @@ class VerificationAgent:
         return results
 
     def verify(self, candidate: ClaimCandidate, context: AgentContext) -> VerificationResult:
+        with span(
+            "verify_claim",
+            kind="agent",
+            inputs={
+                "claim": candidate.claim,
+                "source_agent": candidate.source_agent,
+                "finding_id": candidate.finding_id,
+                "attempt": context.attempt,
+            },
+            metadata={"prompt_version": self.prompt.version},
+        ) as s:
+            result = self._verify(candidate, context)
+            s.set_outputs(
+                status=result.status.value,
+                confidence=result.confidence,
+                explanation=result.explanation,
+                pages=result.pages,
+                citation_quality=getattr(result.citation_quality, "value", result.citation_quality),
+                deterministic_notes=result.deterministic_notes,
+            )
+            return result
+
+    def _verify(self, candidate: ClaimCandidate, context: AgentContext) -> VerificationResult:
         started = time.perf_counter()
         retrieved = self._retrieve(candidate, context)
 

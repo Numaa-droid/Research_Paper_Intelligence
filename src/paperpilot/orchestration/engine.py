@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from ..domain.state import ResearchState, merge_state
 from ..errors import PaperPilotError
 from ..observability import debug, error, info
+from ..tracing import add_event, clip, span
 
 #: Sentinel target meaning "stop here".
 END = "__end__"
@@ -72,6 +73,7 @@ class StateGraph:
         if current in self.routers:
             target = self.routers[current](state)
             debug("graph.route", source=current, target=target)
+            add_event("graph.route", source=current, target=target)
             return target
         return self.edges.get(current, END)
 
@@ -104,21 +106,31 @@ class StateGraph:
 
     def _run_node(self, name: str, state: ResearchState) -> ResearchState | None:
         fn = self.nodes[name]
-        try:
-            return fn(state)
-        except PaperPilotError as exc:
-            error("graph.node_failed", node=name, code=exc.code, error=exc.message)
-            return ResearchState(errors=[f"{name}: {exc.message}"])
-        except Exception as exc:  # noqa: BLE001 - one bad node must not lose the run
-            error(
-                "graph.node_crashed",
-                node=name,
-                error_type=type(exc).__name__,
-                error=str(exc)[:300],
-            )
-            return ResearchState(
-                errors=[f"{name}: unexpected {type(exc).__name__}: {exc}"]
-            )
+        members = self.parallel_groups.get(name)
+        with span(
+            name,
+            kind="node",
+            metadata={"parallel": members} if members else None,
+        ) as s:
+            try:
+                update = fn(state)
+            except PaperPilotError as exc:
+                error("graph.node_failed", node=name, code=exc.code, error=exc.message)
+                s.fail(exc.message, error_type=type(exc).__name__)
+                return ResearchState(errors=[f"{name}: {exc.message}"])
+            except Exception as exc:  # noqa: BLE001 - one bad node must not lose the run
+                error(
+                    "graph.node_crashed",
+                    node=name,
+                    error_type=type(exc).__name__,
+                    error=str(exc)[:300],
+                )
+                s.fail(str(exc), error_type=type(exc).__name__)
+                return ResearchState(
+                    errors=[f"{name}: unexpected {type(exc).__name__}: {exc}"]
+                )
+            s.set_outputs(state_update=describe_update(update))
+            return update
 
     def run(self, state: ResearchState) -> ResearchState:
         if not self.entry:
@@ -144,3 +156,22 @@ class StateGraph:
 
         info("graph.completed", steps=steps)
         return state
+
+
+def describe_update(update: ResearchState | None) -> dict:
+    """What a node wrote to the state, small enough to show in a trace."""
+    described: dict = {}
+    for key, value in (update or {}).items():
+        if key == "events":
+            described[key] = [f"{e.stage}: {e.status} — {e.message}" for e in value]
+        elif isinstance(value, dict):
+            described[key] = {
+                k: getattr(v, "status", None) or f"{type(v).__name__}" for k, v in value.items()
+            }
+        elif isinstance(value, list):
+            described[key] = f"{len(value)} item{'' if len(value) == 1 else 's'}"
+        elif hasattr(value, "model_dump"):
+            described[key] = clip(value.model_dump(mode="json"))
+        else:
+            described[key] = clip(value)
+    return described

@@ -30,6 +30,7 @@ from ..response import parse_markdown
 from ..response.reader import DocumentReader
 from ..retrieval.index import PaperIndex
 from ..retrieval.retriever import RetrievalQuery, RetrievalResult, Retriever
+from ..tracing import span
 from ..validation.evidence import validate_findings
 from .grounding import Grounder, SourceMap, source_label
 from .prompts.registry import PromptTemplate
@@ -212,6 +213,38 @@ class BaseAgent(ABC):
     # --- template method --------------------------------------------------
 
     def run(self, context: AgentContext) -> AgentResult:
+        with span(
+            self.name,
+            kind="agent",
+            inputs={
+                "attempt": context.attempt,
+                "paper_kind": context.paper_kind,
+                "priority_sections": context.priority_sections,
+                "retry_feedback": context.retry_feedback,
+            },
+            metadata={"prompt_version": self.prompt.version, "context_limit": self.context_limit},
+        ) as s:
+            result = self._run(context)
+            s.set_outputs(
+                status=result.status,
+                findings=[
+                    {
+                        "claim": f.claim,
+                        "status": getattr(f.status, "value", f.status),
+                        "evidence": len(f.evidence),
+                        "grounded": f.has_evidence,
+                    }
+                    for f in result.findings
+                ],
+                open_questions=result.open_questions,
+                skip_reason=result.skip_reason,
+                context_chunk_ids=result.context_chunk_ids,
+            )
+            if result.status == "failed":
+                s.fail(result.error or "agent failed", error_type="AgentFailed")
+            return result
+
+    def _run(self, context: AgentContext) -> AgentResult:
         should_run, skip_reason = self.should_run(context)
         if not should_run:
             info("agent.skipped", agent=self.name, reason=skip_reason)
@@ -225,7 +258,20 @@ class BaseAgent(ABC):
         started = time.perf_counter()
         info("agent.started", agent=self.name, attempt=context.attempt)
 
-        results = fit_context(self.retrieve(context), index=context.index)
+        with span("retrieve_context", kind="chain") as s:
+            results = fit_context(self.retrieve(context), index=context.index)
+            s.set_outputs(
+                sources=[
+                    {
+                        "source": source_label(i),
+                        "chunk_id": r.chunk_id,
+                        "page": r.chunk.page,
+                        "section": r.chunk.citation_section,
+                        "matched_by": r.matched_by,
+                    }
+                    for i, r in enumerate(results)
+                ]
+            )
         shown = [r.chunk_id for r in results]
         if not results:
             warning("agent.no_context", agent=self.name)
@@ -264,7 +310,15 @@ class BaseAgent(ABC):
             completion_tokens=response.usage.completion_tokens,
             chars=len(response.text),
         )
-        document = parse_markdown(response.text)
+        with span("parse_markdown", kind="parser", inputs={"chars": len(response.text)}) as s:
+            document = parse_markdown(response.text)
+            s.set_outputs(
+                sections=document.stats.sections,
+                tables=document.stats.tables,
+                quotes=document.stats.blockquotes,
+                citations=document.stats.citations,
+                repairs=document.warnings,
+            )
         info(
             "agent.response_parsed",
             agent=self.name,
@@ -300,7 +354,12 @@ class BaseAgent(ABC):
 
         for finding in findings:
             finding.agent = self.name
-        validate_findings(findings, context.index)
+        with span("validate_findings", kind="tool", inputs={"findings": len(findings)}) as s:
+            validate_findings(findings, context.index)
+            s.set_outputs(
+                grounded=sum(1 for f in findings if f.has_evidence),
+                evidence=sum(len(f.evidence) for f in findings),
+            )
 
         usage = AgentUsage(
             agent=self.name,

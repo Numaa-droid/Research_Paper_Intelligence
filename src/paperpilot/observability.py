@@ -21,7 +21,7 @@ import os
 import sys
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
@@ -39,6 +39,17 @@ _context: ContextVar[dict[str, Any] | None] = ContextVar(
 
 def _current_context() -> dict[str, Any]:
     return _context.get() or {}
+
+
+#: Called with ``(level, event, fields)`` for every structured event; the tracer
+#: uses this to attach log lines to the span that was open when they happened.
+EventListener = Callable[[int, str, dict[str, Any]], None]
+_listeners: list[EventListener] = []
+
+
+def add_event_listener(listener: EventListener) -> None:
+    if listener not in _listeners:
+        _listeners.append(listener)
 
 _RESERVED = {
     "args", "asctime", "created", "exc_info", "exc_text", "filename", "funcName",
@@ -186,6 +197,8 @@ def log_event(level: int, event: str, **fields: Any) -> None:
     """Emit one structured event, merged with the ambient log context."""
     logger = get_logger()
     logger.log(level, event, extra=_sanitize({**_current_context(), **fields}))
+    for listener in _listeners:
+        listener(level, event, fields)
 
 
 def info(event: str, **fields: Any) -> None:

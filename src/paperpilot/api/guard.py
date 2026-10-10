@@ -31,11 +31,11 @@ from ..accounts import AccountService
 from ..errors import AuthenticationError, FileTooLargeError, RateLimitError
 
 SESSION_COOKIE = "pm_session"
-#: Served without a session: the UI shell (it shows the sign-in screen itself),
+#: Served without a session: the UI shells (they show the sign-in screen themselves),
 #: the sign-up and log-in calls, the liveness probe, and the API description.
 PUBLIC_PATHS = frozenset(
     {
-        "/", "/health", "/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json",
+        "/", "/tracing", "/health", "/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json",
         "/auth/config", "/auth/signup", "/auth/login", "/auth/logout",
     }
 )
