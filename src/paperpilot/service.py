@@ -162,6 +162,15 @@ class PaperPilotService:
 
     def create_analysis(self, document_id: str, *, owner_id: str | None = None) -> AnalysisRecord:
         self.get_document(document_id, owner_id=owner_id)
+        # Refuse now rather than in the background task, where a missing file
+        # would leave the run "pending" with nothing to say why.
+        try:
+            self.resolve_path(document_id)
+        except NotFoundError:
+            raise NotFoundError(
+                f"the PDF for document '{document_id}' is no longer stored on this server; "
+                "upload the paper again to analyse it"
+            ) from None
         record = AnalysisRecord(
             analysis_id=new_analysis_id(),
             document_id=document_id,
@@ -203,7 +212,11 @@ class PaperPilotService:
     ) -> AnalysisRecord:
         """Execute the workflow for an existing analysis record."""
         record = self.get_analysis(analysis_id)
-        file_path = self.resolve_path(record.document_id)
+        try:
+            file_path = self.resolve_path(record.document_id)
+        except NotFoundError as exc:
+            self._mark_failed(record, str(exc))
+            raise
         started = time.perf_counter()
 
         with self._lock:
@@ -273,9 +286,24 @@ class PaperPilotService:
                 if status is AnalysisStatus.FAILED:
                     root.fail("; ".join(final.get("errors", [])) or "the analysis failed")
             return self._persist(record, final, started)
+        except Exception as exc:
+            # A crash outside the workflow's own error handling must still end the
+            # run, or clients poll a "pending" record forever.
+            self._mark_failed(record, f"the analysis crashed: {exc}")
+            raise
         finally:
             with self._lock:
                 self._live_events.pop(analysis_id, None)
+
+    def _mark_failed(self, record: AnalysisRecord, message: str) -> None:
+        if record.status in TERMINAL_STATUSES:
+            return
+        now = datetime.now(UTC)
+        record.status = AnalysisStatus.FAILED
+        record.errors = [*record.errors, message]
+        record.updated_at = now
+        record.completed_at = now
+        self.analyses.save(record)
 
     def analyze_file(
         self, file_path: str | Path, *, event_sink: EventSink | None = None

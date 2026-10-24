@@ -328,6 +328,29 @@ def test_reported_values_are_parsed_for_charts(value, expected):
     assert parse_number(value) == expected
 
 
+def test_analysing_a_paper_whose_file_is_gone_is_refused_at_once(client, pdf_bytes, service):
+    document_id = _upload(client, pdf_bytes).json()["document_id"]
+    service.resolve_path(document_id).unlink()
+
+    response = client.post(f"/papers/{document_id}/analyze")
+    assert response.status_code == 404
+    assert "upload the paper again" in response.json()["message"]
+
+
+def test_a_run_whose_file_vanished_ends_failed_not_pending(client, pdf_bytes, service):
+    from paperpilot.errors import NotFoundError
+
+    document_id = _upload(client, pdf_bytes).json()["document_id"]
+    record = service.create_analysis(document_id)
+    service.resolve_path(document_id).unlink()
+
+    with pytest.raises(NotFoundError):
+        service.run_analysis(record.analysis_id)
+    stored = service.get_analysis(record.analysis_id)
+    assert stored.status is AnalysisStatus.FAILED
+    assert stored.errors
+
+
 def test_response_document_schema_is_published(client):
     schema = client.get("/schemas/response-document").json()
     assert schema["$schema"].startswith("https://json-schema.org/")
