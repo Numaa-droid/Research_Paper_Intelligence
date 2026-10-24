@@ -365,6 +365,29 @@ def get_brief(
     return PlainTextResponse(record.brief_markdown, media_type="text/markdown; charset=utf-8")
 
 
+@router.get("/analyses/{analysis_id}/visuals", tags=["analyses"])
+def get_visuals(
+    analysis_id: str,
+    user: User = Depends(current_user),
+    service: PaperPilotService = Depends(get_service),
+) -> dict:
+    """The analysis shaped for charts: the paper's story, method steps, verified
+    numbers and verification verdicts. Only re-found, own-paper numbers are included."""
+    from ..reporting.visuals import build_visuals
+
+    record = service.get_analysis(analysis_id, owner_id=user.user_id)
+    if record.status is not AnalysisStatus.COMPLETED:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "report_not_ready",
+                "message": f"analysis is '{record.status.value}', not completed",
+                "details": {"status": record.status.value},
+            },
+        )
+    return build_visuals(record, service.documents.get(record.document_id))
+
+
 def _pdf_response(service: PaperPilotService, record, markdown: str, *, kind: str) -> Response:
     from ..reporting.pdf import render_report_pdf, report_filename
 

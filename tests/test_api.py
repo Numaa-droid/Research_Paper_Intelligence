@@ -289,6 +289,45 @@ def test_findings_endpoint_omits_raw_model_responses(client, pdf_bytes):
     assert "response_markdown" not in verdict
 
 
+def test_visuals_endpoint_returns_chartable_data(client, pdf_bytes):
+    document_id = _upload(client, pdf_bytes).json()["document_id"]
+    analysis_id = client.post(f"/papers/{document_id}/analyze").json()["analysis_id"]
+    body = client.get(f"/analyses/{analysis_id}/visuals").json()
+
+    assert body["paper"]["page_count"] > 0
+    assert set(body["story"]) == {"problem", "approach", "result", "limitations"}
+    assert body["verification"] and body["verification"][0]["status"]
+    for row in body["results"]:
+        # Only numbers whose evidence was re-found in the paper are charted.
+        assert row["page"] >= 1
+        assert row["number"] is None or isinstance(row["number"], float)
+
+
+def test_visuals_are_refused_before_the_analysis_completes(client, pdf_bytes, service):
+    document_id = _upload(client, pdf_bytes).json()["document_id"]
+    record = service.create_analysis(document_id, owner_id=client.get("/auth/me").json()["user_id"])
+    response = client.get(f"/analyses/{record.analysis_id}/visuals")
+    assert response.status_code == 409
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("81.4", (81.4, "")),
+        ("81.4 ± 0.3", (81.4, "")),
+        ("45.2%", (45.2, "%")),
+        ("3.1x fewer FLOPs", (3.1, "×")),
+        ("1,234", (1234.0, "")),
+        ("n/a", (None, "")),
+        ("12 examples", (12.0, "")),
+    ],
+)
+def test_reported_values_are_parsed_for_charts(value, expected):
+    from paperpilot.reporting.visuals import parse_number
+
+    assert parse_number(value) == expected
+
+
 def test_response_document_schema_is_published(client):
     schema = client.get("/schemas/response-document").json()
     assert schema["$schema"].startswith("https://json-schema.org/")
