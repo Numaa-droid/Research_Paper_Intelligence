@@ -11,7 +11,7 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-64748b?style=flat-square)
 [![Live demo](https://img.shields.io/badge/%E2%96%B6-Live%20demo-ef4444?style=flat-square)](https://papermind-t344.onrender.com/)
 
-> **[Live demo](https://papermind-t344.onrender.com/)**: sign in, upload a research-paper PDF and follow the agents live; the report cites a page and section for every grounded claim. The free server sleeps when idle, so the first load can take about a minute.
+> **[Live demo](https://papermind-t344.onrender.com/)** (invite only): creating an account needs an invite code, so [ask me on LinkedIn](https://www.linkedin.com/in/saurabh-kadam6998/) for one. Then upload a research-paper PDF and follow the agents live; the report cites a page and section for every grounded claim. The demo runs on Render with OpenAI `gpt-4.1-mini` and `text-embedding-3-small` embeddings. The free server sleeps when idle, so the first load can take about a minute.
 
 Built by **Saurabh Kadam** · [LinkedIn](https://www.linkedin.com/in/saurabh-kadam6998/) · [Portfolio](https://saurabh-portfolio-blush.vercel.app/) · [GitHub](https://github.com/Numaa-droid) · MIT [license](LICENSE)
 
