@@ -1,0 +1,31 @@
+# Runs lint and the test suite on every push to main and every pull request.
+# No secrets are needed: the tests run offline (mock model, hashing embedder, generated fixture PDF).
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: lint and pytest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install (Python 3.11, dev extras)
+        run: uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -e ".[dev]"
+      - name: Lint
+        run: .venv/bin/ruff check src tests
+      - name: Run tests
+        run: .venv/bin/pytest

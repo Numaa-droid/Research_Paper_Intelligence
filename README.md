@@ -1,18 +1,19 @@
----
-title: PaperMind
-emoji: 📄
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 8000
-pinned: false
----
-
-# PaperPilot
+# PaperMind
 
 **A verifiable, citation-grounded, multi-agent system for analysing research papers.**
 
-You give PaperPilot one research-paper PDF. It parses and indexes the paper with
+[![Tests](https://github.com/Numaa-droid/Research_Paper_Intelligence/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Numaa-droid/Research_Paper_Intelligence/actions/workflows/tests.yml)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat-square)
+![License: MIT](https://img.shields.io/badge/license-MIT-64748b?style=flat-square)
+[![Live demo](https://img.shields.io/badge/%E2%96%B6-Live%20demo-ef4444?style=flat-square)](https://papermind-t344.onrender.com/)
+
+> **[Live demo](https://papermind-t344.onrender.com/)**: sign in, upload a research-paper PDF and follow the agents live; the report cites a page and section for every grounded claim. The free server sleeps when idle, so the first load can take about a minute.
+
+Built by **Saurabh Kadam** · [LinkedIn](https://www.linkedin.com/in/saurabh-kadam6998/) · [Portfolio](https://saurabh-portfolio-blush.vercel.app/) · [GitHub](https://github.com/Numaa-droid) · MIT [license](LICENSE)
+
+*In the code, PaperMind keeps its working name: the `paperpilot` package and CLI, and `PAPERPILOT_*` settings.*
+
+You give PaperMind one research-paper PDF. It parses and indexes the paper with
 page-level metadata, plans an analysis, runs specialist agents over *targeted*
 evidence, verifies high-impact claims against the original text, retries the
 analyses that failed to ground, and produces a Markdown report in which every
@@ -33,14 +34,12 @@ found in the paper at that location.
 
 **It is** a domain-specific application for reading one research paper carefully.
 
-**It is not** artificial general intelligence, and nothing in it is human-level or
-generally intelligent. It has no knowledge of a paper beyond the PDF you submit.
-It verifies claims **only against that paper's own text** — it cannot tell you
-whether the authors are right about the world, reproduce their experiments, or
-detect an error the paper does not itself reveal.
+**It is not** a judge of whether the paper is right. It knows nothing beyond the
+PDF you submit and verifies claims **only against that paper's own text**, so it
+cannot reproduce experiments or catch an error the paper does not itself reveal.
 
 The design bet is narrow and testable: **factual grounding beats fluent prose.**
-Where the two conflict, PaperPilot reports the gap rather than writing around it.
+Where the two conflict, PaperMind reports the gap rather than writing around it.
 
 ---
 
@@ -129,7 +128,7 @@ python -m paperpilot analyze fixtures/generated/synthetic_paper.pdf \
 Run the test suite:
 
 ```bash
-pytest                      # 348 tests, no network, no credentials
+pytest                      # 697 tests, no network, no credentials (also run on GitHub Actions)
 ruff check src tests        # lint
 ```
 
@@ -692,7 +691,7 @@ PyMuPDF reports the blocks a PDF's content stream declares. On many journal
 templates that is one block per column run, with a section heading, its
 paragraph and a figure caption fused into a single object — so the real headings
 are invisible to any "short line" test, and the only heading-shaped blocks left
-on the page are running heads, chart titles and table column headers. PaperPilot
+on the page are running heads, chart titles and table column headers. PaperMind
 recovers the structure from line geometry by default, which handles this; where
 it does not, a layout model can be asked what the page actually contains.
 
@@ -766,11 +765,11 @@ per-agent prompt A/B evaluation using the existing harness.
 
 ## In one paragraph
 
-> PaperPilot is a domain-specific, citation-grounded multi-agent system. Its
+> PaperMind is a domain-specific, citation-grounded multi-agent system. Its
 > Orchestrator dynamically decomposes paper analysis, routes targeted evidence to
 > specialized agents, verifies high-impact claims against the original paper, and
 > retries weak analyses before producing a structured report.
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 Saurabh Kadam

@@ -56,7 +56,7 @@ paperpilot = ["web/*.html", "agents/prompts/*.md", "agents/specs/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]  # "." so tests can import shared helpers from tests.conftest
 addopts = "-q"
 filterwarnings = ["ignore::DeprecationWarning"]
 markers = ["slow: long-running tests"]
