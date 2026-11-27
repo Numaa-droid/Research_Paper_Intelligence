@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.svg" alt="PaperMind: every claim checked against the page. A research paper's Table 1 row is cited by a supported claim: SRT-Large reaches 81.4 F1 on NarrativeQA, [p. 4, §4.2, Table 1]." width="100%">
+</p>
+
 # PaperMind
 
 **A verifiable, citation-grounded, multi-agent system for analysing research papers.**
@@ -44,6 +48,12 @@ Where the two conflict, PaperMind reports the gap rather than writing around it.
 ---
 
 ## Architecture
+
+<p align="center">
+  <img src="assets/pipeline.svg" alt="Six steps: ingest and index the PDF once, then plan, analyse with specialist agents, verify and report. Agents whose claims fail to ground are retried a limited number of times." width="100%">
+</p>
+
+The full component diagram and the state graph, for engineers:
 
 ```mermaid
 flowchart TD
@@ -275,6 +285,10 @@ small papers, not recommended otherwise. Interactive docs are at `/docs`.
 
 ## Agent responsibilities
 
+<p align="center">
+  <img src="assets/agents.svg" alt="A planner chooses specialist agents: summary, methodology, experiments, and math only when the paper has mathematics. A verification agent re-checks their claims and a synthesizer writes the report without a model call." width="100%">
+</p>
+
 Each agent receives only the task, the paper metadata, and the evidence its own
 retrieval queries returned. **No agent reads the whole PDF**, and no agent's prose
 is passed to another agent — only validated Pydantic models cross node
@@ -307,6 +321,10 @@ which agents ran and why.
 ---
 
 ## Evidence and verification design
+
+<p align="center">
+  <img src="assets/verification.svg" alt="A claim is re-checked by code (page in range, quote present, section resolves, numbers match); quotes match exactly, after normalising, approximately (labelled) or not at all, and an unverifiable quote is never shown as a citation." width="100%">
+</p>
 
 ### The paper intelligence layer
 
