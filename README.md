@@ -53,66 +53,7 @@ Where the two conflict, PaperMind reports the gap rather than writing around it.
   <img src="assets/pipeline.svg" alt="Six steps: ingest and index the PDF once, then plan, analyse with specialist agents, verify and report. Agents whose claims fail to ground are retried a limited number of times." width="100%">
 </p>
 
-The full component diagram and the state graph, for engineers:
-
-```mermaid
-flowchart TD
-    CLI["CLI / HTTP API / Web UI"] --> SVC["Application service"]
-    SVC --> ORCH["Orchestrator — typed state graph"]
-
-    ORCH --> ING["Ingestion service"]
-    ING --> PARSE["PyMuPDF extraction<br/>page boundaries preserved"]
-    PARSE --> OCR{"Native text<br/>sufficient?"}
-    OCR -- "no" --> TESS["OCR fallback<br/>(behind an interface)"]
-    OCR -- "yes" --> LAY
-    TESS --> LAY{"Layout analysis<br/>enabled?"}
-    LAY -- "yes" --> PPS["PP-Structure<br/>regions per page<br/>(deterministic, cached)"]
-    LAY -- "no" --> ELEM
-    PPS --> ELEM["Structure detection<br/>sections · tables · figures<br/>equations · references"]
-    ELEM --> CHUNK["Page-aware chunking"]
-    CHUNK --> IDX[("Paper intelligence index<br/>BM25 + dense + metadata")]
-
-    ORCH --> PLAN["Planner<br/>which agents does this paper need?"]
-    PLAN --> AGENTS
-
-    subgraph AGENTS ["Specialist agents (run in parallel)"]
-        direction LR
-        SUM["Summary"]
-        MET["Methodology"]
-        EXP["Experiments"]
-        MATH["Math<br/>(conditional)"]
-    end
-
-    IDX -.->|"targeted retrieval"| AGENTS
-    AGENTS --> AGG["Aggregate typed findings"]
-    AGG --> CLAIMS["Extract high-impact claims"]
-    CLAIMS --> VER["Verification agent<br/>re-retrieves evidence independently"]
-    IDX -.->|"independent retrieval"| VER
-
-    VER --> DET["Deterministic validation<br/>page ranges · quote presence<br/>numeric equality · schemas"]
-    DET --> RETRY{"Grounded above<br/>threshold?"}
-    RETRY -- "no, budget left" --> AGENTS
-    RETRY -- "yes / budget spent" --> SYN["Report synthesizer<br/>(no model call)"]
-    SYN --> REPORT["Markdown report<br/>with page-level evidence"]
-```
-
-### The state graph
-
-```mermaid
-stateDiagram-v2
-    [*] --> ingest
-    ingest --> plan: index ready
-    ingest --> [*]: ingestion failed
-    plan --> specialists
-    specialists --> aggregate
-    aggregate --> verify
-    verify --> retry: claims below threshold<br/>and budget remains
-    verify --> synthesize: grounded, or budget spent
-    retry --> aggregate
-    synthesize --> [*]
-```
-
-The retry edge is a real cycle, bounded by `max_retries`. Only the agents that
+The retry loop (the dashed arrow above) is a real cycle, bounded by `max_retries`. Only the agents that
 failed to ground are re-run, and they are told exactly which claims were
 rejected and why.
 
