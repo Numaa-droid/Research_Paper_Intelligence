@@ -1,109 +1,90 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="600" viewBox="0 0 1280 600" role="img" aria-labelledby="t d">
   <title id="t">The PaperMind agent team</title>
-  <desc id="d">A planner chooses specialist agents (summary, methodology, experiments, and math only when the paper has mathematics); a verification agent re-checks their claims; a synthesizer writes the report without a model call.</desc>
+  <desc id="d">The planner fans a paper out to specialist agents: summary, methodology, experiments, and math only when the paper has mathematics. Their findings merge into the verification agent, then the synthesizer.</desc>
   <defs>
-    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset=".45" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-    <linearGradient id="gradH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a78bfa"/><stop offset=".5" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-    <linearGradient id="gradV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
-    <linearGradient id="gradC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
-    <radialGradient id="glowV" cx=".08" cy="-.05" r=".7"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".35"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></radialGradient>
-    <radialGradient id="glowC" cx="1" cy=".1" r=".6"><stop offset="0" stop-color="#22d3ee" stop-opacity=".2"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#94a3b8" stroke-opacity=".07"/></pattern>
-    <linearGradient id="fadeGrid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-    <mask id="gridMask"><rect width="1280" height="640" fill="url(#fadeGrid)"/></mask>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".5"/></filter>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22d3ee"/></marker>
-    <marker id="arrowV" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c4b5fd"/></marker>
-    <marker id="arrowR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f43f5e"/></marker>
-    <marker id="arrowG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22c55e"/></marker>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="#c9b98f" fill-opacity=".45"/></pattern>
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#5c4a24" flood-opacity=".18"/></filter>
+    <marker id="aInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1f2a44"/></marker>
+    <marker id="aCoral" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d4573a"/></marker>
+    <marker id="aGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f855a"/></marker>
     <style>
+      .serif{font-family:Georgia,"Iowan Old Style","Times New Roman",serif}
       .sans{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
       .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
-      .flow{stroke-dasharray:6 7;animation:flow 1.1s linear infinite}
-      @keyframes flow{to{stroke-dashoffset:-26}}
-      .pulse{animation:pulse 2.4s ease-in-out infinite}
-      @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
-      .grow{transform-box:fill-box;transform-origin:50% 100%;animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both}
-      @keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-      .pop{transform-box:fill-box;transform-origin:50% 50%;animation:pop 2.8s ease-in-out infinite}
-      @keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-      @media (prefers-reduced-motion:reduce){.flow,.pulse,.grow,.pop{animation:none}}
+      .ink{stroke-dasharray:7 6;animation:ink 1.4s linear infinite}
+      @keyframes ink{to{stroke-dashoffset:-26}}
+      .glow{animation:glow 2.6s ease-in-out infinite}
+      @keyframes glow{0%,100%{opacity:.6}50%{opacity:1}}
+      @media (prefers-reduced-motion:reduce){.ink,.glow{animation:none}}
     </style>
   </defs>
-  <rect width="1280" height="640" rx="24" fill="#060a14"/>
-  <rect width="1280" height="640" rx="24" fill="url(#glowV)"/>
-  <rect width="1280" height="640" rx="24" fill="url(#glowC)"/>
-  <rect width="1280" height="640" rx="24" fill="url(#grid)" mask="url(#gridMask)"/>
-  <rect x=".5" y=".5" width="1279" height="639" rx="24" fill="none" stroke="#94a3b8" stroke-opacity=".18"/>
+  <rect width="1280" height="600" rx="18" fill="#fbf7ef"/>
+  <rect width="1280" height="600" rx="18" fill="url(#dots)"/>
+  <rect x="1" y="1" width="1278" height="598" rx="17" fill="none" stroke="#e7dcc6" stroke-width="2"/>
 
-<text class="sans" x="48.0" y="70.0" font-size="30" fill="#e7ecf6" font-weight="800" letter-spacing="-.6">The agent team</text><text class="sans" x="48.0" y="100.0" font-size="15.5" fill="#8d99b3">No agent reads the whole PDF, and agents never pass prose to each other: only validated, typed findings.</text>
-<rect x="48" y="140" width="300" height="132" rx="16" fill="#0d1424" stroke="#f59e0b" stroke-opacity=".4" filter="url(#shadow)"/>
-<rect x="62" y="140" width="272" height="3" rx="1.5" fill="#f59e0b" fill-opacity=".9"/>
-<rect x="68" y="162" width="52" height="52" rx="14" fill="#f59e0b" fill-opacity=".12" stroke="#f59e0b" stroke-opacity=".45"/><path d="M80.0 169.0h20l9 9v29h-29z" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M100.0 169.0v9h9" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M86.0 184.0h16M86.0 191.0h16M86.0 198.0h10" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="136.0" y="181.0" font-size="11" fill="#fcd34d" font-weight="700" letter-spacing="1.4">INPUT</text>
-<text class="sans" x="136.0" y="206.0" font-size="20" fill="#e7ecf6" font-weight="800">One paper</text>
-<text class="sans" x="68.0" y="242.0" font-size="13.5" fill="#a9b4cc">A research-paper PDF,</text>
-<text class="sans" x="68.0" y="262.0" font-size="13.5" fill="#a9b4cc">indexed page by page.</text>
-<rect x="446" y="140" width="388" height="132" rx="16" fill="#0d1424" stroke="#c4b5fd" stroke-opacity=".4" filter="url(#shadow)"/>
-<rect x="460" y="140" width="360" height="3" rx="1.5" fill="#c4b5fd" fill-opacity=".9"/>
-<rect x="466" y="162" width="52" height="52" rx="14" fill="#c4b5fd" fill-opacity=".12" stroke="#c4b5fd" stroke-opacity=".45"/><rect x="486.0" y="169.0" width="12" height="10" rx="2" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="472.0" y="197.0" width="12" height="10" rx="2" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="486.0" y="197.0" width="12" height="10" rx="2" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="500.0" y="197.0" width="12" height="10" rx="2" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M492.0 179.0v18M492.0 188.0h-14v9M492.0 188.0h14v9" fill="none" stroke="#c4b5fd" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="534.0" y="181.0" font-size="11" fill="#c4b5fd" font-weight="700" letter-spacing="1.4">TEAM LEAD</text>
-<text class="sans" x="534.0" y="206.0" font-size="20" fill="#e7ecf6" font-weight="800">Planner</text>
-<text class="sans" x="466.0" y="242.0" font-size="13.5" fill="#a9b4cc">Chooses which specialists this paper</text>
-<text class="sans" x="466.0" y="262.0" font-size="13.5" fill="#a9b4cc">needs, and says why.</text>
-<rect x="932" y="140" width="300" height="132" rx="16" fill="#0d1424" stroke="#f59e0b" stroke-opacity=".4" filter="url(#shadow)"/>
-<rect x="946" y="140" width="272" height="3" rx="1.5" fill="#f59e0b" fill-opacity=".9"/>
-<rect x="952" y="162" width="52" height="52" rx="14" fill="#f59e0b" fill-opacity=".12" stroke="#f59e0b" stroke-opacity=".45"/><path d="M964.0 169.0h28v38h-28z" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M970.0 179.0l2.5 2.5 4-4M979.0 180.0h7M970.0 189.0l2.5 2.5 4-4M979.0 190.0h7M970.0 200.0h16" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="1020.0" y="181.0" font-size="11" fill="#fcd34d" font-weight="700" letter-spacing="1.4">WRITER</text>
-<text class="sans" x="1020.0" y="206.0" font-size="20" fill="#e7ecf6" font-weight="800">Synthesizer</text>
-<text class="sans" x="952.0" y="242.0" font-size="13.5" fill="#a9b4cc">Renders the report from validated</text>
-<text class="sans" x="952.0" y="262.0" font-size="13.5" fill="#a9b4cc">findings. No model call.</text>
-<path class="flow" d="M352 206.0 H440" stroke="#22d3ee" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
-<path class="flow" d="M838 206.0 H926" stroke="#22c55e" stroke-width="2" fill="none" marker-end="url(#arrowG)"/>
-<text class="sans" x="882.0" y="194.0" font-size="11.5" fill="#86efac" font-weight="600" text-anchor="middle">verified findings</text>
-<rect x="48" y="352" width="278" height="178" rx="16" fill="#0d1424" stroke="#22d3ee" stroke-opacity=".4" filter="url(#shadow)"/>
-<rect x="62" y="352" width="250" height="3" rx="1.5" fill="#22d3ee" fill-opacity=".9"/>
-<rect x="68" y="374" width="52" height="52" rx="14" fill="#22d3ee" fill-opacity=".12" stroke="#22d3ee" stroke-opacity=".45"/><path d="M80.0 381.0h28v38h-28z" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M86.0 391.0l2.5 2.5 4-4M95.0 392.0h7M86.0 401.0l2.5 2.5 4-4M95.0 402.0h7M86.0 412.0h16" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="136.0" y="393.0" font-size="11" fill="#67e8f9" font-weight="700" letter-spacing="1.4">SPECIALIST</text>
-<text class="sans" x="136.0" y="418.0" font-size="20" fill="#e7ecf6" font-weight="800">Summary</text>
-<text class="sans" x="68.0" y="454.0" font-size="13.5" fill="#a9b4cc">Problem, contribution, data,</text>
-<text class="sans" x="68.0" y="474.0" font-size="13.5" fill="#a9b4cc">method, results, limitations.</text>
-<rect x="68.0" y="488" width="63" height="26" rx="13.0" fill="#22d3ee" fill-opacity=".13" stroke="#22d3ee" stroke-opacity=".5"/><text class="sans" x="99.5" y="505.3" font-size="12" fill="#67e8f9" font-weight="600" text-anchor="middle">always</text>
-<rect x="350" y="352" width="278" height="178" rx="16" fill="#0d1424" stroke="#8b5cf6" stroke-opacity=".4" filter="url(#shadow)"/>
-<rect x="364" y="352" width="250" height="3" rx="1.5" fill="#8b5cf6" fill-opacity=".9"/>
-<rect x="370" y="374" width="52" height="52" rx="14" fill="#8b5cf6" fill-opacity=".12" stroke="#8b5cf6" stroke-opacity=".45"/><rect x="390.0" y="381.0" width="12" height="10" rx="2" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="376.0" y="409.0" width="12" height="10" rx="2" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="390.0" y="409.0" width="12" height="10" rx="2" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="404.0" y="409.0" width="12" height="10" rx="2" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M396.0 391.0v18M396.0 400.0h-14v9M396.0 400.0h14v9" fill="none" stroke="#8b5cf6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="438.0" y="393.0" font-size="11" fill="#c4b5fd" font-weight="700" letter-spacing="1.4">SPECIALIST</text>
-<text class="sans" x="438.0" y="418.0" font-size="20" fill="#e7ecf6" font-weight="800">Methodology</text>
-<text class="sans" x="370.0" y="454.0" font-size="13.5" fill="#a9b4cc">Architecture, training, inference,</text>
-<text class="sans" x="370.0" y="474.0" font-size="13.5" fill="#a9b4cc">design decisions, prior work.</text>
-<rect x="370.0" y="488" width="63" height="26" rx="13.0" fill="#8b5cf6" fill-opacity=".13" stroke="#8b5cf6" stroke-opacity=".5"/><text class="sans" x="401.5" y="505.3" font-size="12" fill="#c4b5fd" font-weight="600" text-anchor="middle">always</text>
-<rect x="652" y="352" width="278" height="178" rx="16" fill="#0d1424" stroke="#2dd4bf" stroke-opacity=".4" filter="url(#shadow)"/>
-<rect x="666" y="352" width="250" height="3" rx="1.5" fill="#2dd4bf" fill-opacity=".9"/>
-<rect x="672" y="374" width="52" height="52" rx="14" fill="#2dd4bf" fill-opacity=".12" stroke="#2dd4bf" stroke-opacity=".45"/><path d="M681.0 382.0v36h34" fill="none" stroke="#2dd4bf" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M688.0 410.0v-8M696.0 410.0v-16M704.0 410.0v-11M712.0 410.0v-22" fill="none" stroke="#2dd4bf" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="740.0" y="393.0" font-size="11" fill="#5eead4" font-weight="700" letter-spacing="1.4">SPECIALIST</text>
-<text class="sans" x="740.0" y="418.0" font-size="20" fill="#e7ecf6" font-weight="800">Experiments</text>
-<text class="sans" x="672.0" y="454.0" font-size="13.5" fill="#a9b4cc">Datasets, baselines, metrics,</text>
-<text class="sans" x="672.0" y="474.0" font-size="13.5" fill="#a9b4cc">ablations, significance.</text>
-<rect x="672.0" y="488" width="172" height="26" rx="13.0" fill="#2dd4bf" fill-opacity=".13" stroke="#2dd4bf" stroke-opacity=".5"/><text class="sans" x="758.2" y="505.3" font-size="12" fill="#5eead4" font-weight="600" text-anchor="middle">when results are found</text>
-<rect x="954" y="352" width="278" height="178" rx="16" fill="#0d1424" stroke="#f59e0b" stroke-opacity=".4" filter="url(#shadow)"/>
-<rect x="968" y="352" width="250" height="3" rx="1.5" fill="#f59e0b" fill-opacity=".9"/>
-<rect x="974" y="374" width="52" height="52" rx="14" fill="#f59e0b" fill-opacity=".12" stroke="#f59e0b" stroke-opacity=".45"/><path d="M1013.0 384.0h-26l14 16l-14 16h26" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="1042.0" y="393.0" font-size="11" fill="#fcd34d" font-weight="700" letter-spacing="1.4">SPECIALIST</text>
-<text class="sans" x="1042.0" y="418.0" font-size="20" fill="#e7ecf6" font-weight="800">Math</text>
-<text class="sans" x="974.0" y="454.0" font-size="13.5" fill="#a9b4cc">Equations, variables, losses,</text>
-<text class="sans" x="974.0" y="474.0" font-size="13.5" fill="#a9b4cc">objectives, derivations.</text>
-<rect x="974.0" y="488" width="207" height="26" rx="13.0" fill="#f59e0b" fill-opacity=".13" stroke="#f59e0b" stroke-opacity=".5"/><text class="sans" x="1077.3" y="505.3" font-size="12" fill="#fcd34d" font-weight="600" text-anchor="middle">only if the paper has maths</text>
-<path class="flow" d="M580 274 C 580 318, 187.0 308, 187.0 346" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-opacity=".9" marker-end="url(#arrowV)"/>
-<path class="flow" d="M620 274 C 620 318, 489.0 308, 489.0 346" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-opacity=".9" marker-end="url(#arrowV)"/>
-<path class="flow" d="M660 274 C 660 318, 791.0 308, 791.0 346" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-opacity=".9" marker-end="url(#arrowV)"/>
-<path class="flow" d="M700 274 C 700 318, 1093.0 308, 1093.0 346" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-opacity=".9" marker-end="url(#arrowV)"/>
-<rect x="487" y="298" width="306" height="28" rx="14" fill="#060a14" stroke="#8b5cf6" stroke-opacity=".6"/>
-<text class="mono" x="640.0" y="316.5" font-size="12" fill="#c4b5fd" font-weight="600" text-anchor="middle">targeted evidence ↓   typed findings ↑</text>
-<path d="M187.0 532 V560" stroke="#22c55e" stroke-opacity=".5" stroke-dasharray="2 4"/>
-<path d="M489.0 532 V560" stroke="#22c55e" stroke-opacity=".5" stroke-dasharray="2 4"/>
-<path d="M791.0 532 V560" stroke="#22c55e" stroke-opacity=".5" stroke-dasharray="2 4"/>
-<path d="M1093.0 532 V560" stroke="#22c55e" stroke-opacity=".5" stroke-dasharray="2 4"/>
-<rect x="48" y="564" width="1184" height="54" rx="14" fill="#0d1424" stroke="#22c55e" stroke-opacity=".5"/>
-<path d="M80 572l15 5v11c0 10-6.5 16.5-15 20c-8.5-3.5-15-10-15-20v-11z" fill="none" stroke="#86efac" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M73 591l5 5l9-10" fill="none" stroke="#86efac" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="112" y="596" font-size="13.5" fill="#a9b4cc"><tspan font-size="14.5" font-weight="700" fill="#e7ecf6">Verification agent:</tspan> re-retrieves evidence for every high-impact claim on its own, then code checks pages, quotes and numbers. Failed agents are retried.</text>
+<text class="serif" x="56.0" y="74.0" font-size="32" fill="#1f2a44" font-weight="700" letter-spacing="-.3">The agent team</text><rect x="56" y="86" width="56" height="4" rx="2" fill="#d4573a"/><text class="sans" x="56.0" y="116.0" font-size="15.5" fill="#5b6475">No agent reads the whole PDF, and agents never pass prose to each other: only validated, typed findings.</text>
+<path d="M60 292 h92 l26 26 v114 h-118 z" fill="#ffffff" stroke="#1f2a44" stroke-width="1.6" filter="url(#lift)"/>
+<path d="M152 292 v26 h26" fill="none" stroke="#1f2a44" stroke-width="1.6"/>
+<line x1="76" y1="338" x2="160" y2="338" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>
+<line x1="76" y1="354" x2="160" y2="354" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>
+<line x1="76" y1="370" x2="160" y2="370" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>
+<line x1="76" y1="386" x2="160" y2="386" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>
+<line x1="76" y1="402" x2="122" y2="402" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>
+<text class="serif" x="119.0" y="460.0" font-size="15" fill="#1f2a44" font-weight="700" text-anchor="middle" font-style="italic">one paper</text>
+<path class="ink" d="M184 362 H234" stroke="#1f2a44" stroke-width="2" marker-end="url(#aInk)"/>
+<circle cx="330" cy="362" r="92" fill="none" stroke="#d4573a" stroke-width="1.4" stroke-dasharray="3 5"/>
+<circle cx="330" cy="362" r="82" fill="#1f2a44"/>
+<text class="serif" x="330.0" y="356.0" font-size="22" fill="#fff" font-weight="700" text-anchor="middle">Planner</text>
+<text class="sans" x="330.0" y="378.0" font-size="12" fill="#cfd5e2" text-anchor="middle">picks the specialists</text>
+<text class="sans" x="330.0" y="394.0" font-size="12" fill="#cfd5e2" text-anchor="middle">and says why</text>
+<path d="M534 173.0 v-12 q0 -4 4 -4 h57 q4 0 4 4 v12 z" fill="#dce8f5" stroke="#2b6cb0" stroke-width="1.4"/>
+<text class="sans" x="545.0" y="169.0" font-size="9.5" fill="#1f4f82" font-weight="700" letter-spacing=".5">ALWAYS</text>
+<rect x="520" y="173.0" width="400" height="78" rx="8" fill="#ffffff" stroke="#2b6cb0" stroke-width="1.6" filter="url(#lift)"/>
+<circle cx="558" cy="212.0" r="20" fill="#dce8f5" stroke="#2b6cb0" stroke-width="1.6"/>
+<text class="serif" x="558.0" y="219.0" font-size="19" fill="#1f4f82" font-weight="700" text-anchor="middle">S</text>
+<text class="serif" x="592.0" y="208.0" font-size="18" fill="#1f2a44" font-weight="700">Summary</text>
+<text class="sans" x="592.0" y="229.0" font-size="12.5" fill="#5b6475">problem, contribution, data, results, limits</text>
+<path class="ink" d="M424 362 C 482 362, 450 212.0, 512 212.0" fill="none" stroke="#2b6cb0" stroke-width="2" marker-end="url(#aInk)"/>
+<path d="M534 273.0 v-12 q0 -4 4 -4 h57 q4 0 4 4 v12 z" fill="#fbe4dc" stroke="#d4573a" stroke-width="1.4"/>
+<text class="sans" x="545.0" y="269.0" font-size="9.5" fill="#a8412a" font-weight="700" letter-spacing=".5">ALWAYS</text>
+<rect x="520" y="273.0" width="400" height="78" rx="8" fill="#ffffff" stroke="#d4573a" stroke-width="1.6" filter="url(#lift)"/>
+<circle cx="558" cy="312.0" r="20" fill="#fbe4dc" stroke="#d4573a" stroke-width="1.6"/>
+<text class="serif" x="558.0" y="319.0" font-size="19" fill="#a8412a" font-weight="700" text-anchor="middle">M</text>
+<text class="serif" x="592.0" y="308.0" font-size="18" fill="#1f2a44" font-weight="700">Methodology</text>
+<text class="sans" x="592.0" y="329.0" font-size="12.5" fill="#5b6475">architecture, training, inference, design</text>
+<path class="ink" d="M424 362 C 482 362, 450 312.0, 512 312.0" fill="none" stroke="#d4573a" stroke-width="2" marker-end="url(#aInk)"/>
+<path d="M534 373.0 v-12 q0 -4 4 -4 h152 q4 0 4 4 v12 z" fill="#dcefe3" stroke="#2f855a" stroke-width="1.4"/>
+<text class="sans" x="545.0" y="369.0" font-size="9.5" fill="#22643f" font-weight="700" letter-spacing=".5">WHEN RESULTS ARE FOUND</text>
+<rect x="520" y="373.0" width="400" height="78" rx="8" fill="#ffffff" stroke="#2f855a" stroke-width="1.6" filter="url(#lift)"/>
+<circle cx="558" cy="412.0" r="20" fill="#dcefe3" stroke="#2f855a" stroke-width="1.6"/>
+<text class="serif" x="558.0" y="419.0" font-size="19" fill="#22643f" font-weight="700" text-anchor="middle">E</text>
+<text class="serif" x="592.0" y="408.0" font-size="18" fill="#1f2a44" font-weight="700">Experiments</text>
+<text class="sans" x="592.0" y="429.0" font-size="12.5" fill="#5b6475">datasets, baselines, metrics, ablations</text>
+<path class="ink" d="M424 362 C 482 362, 450 412.0, 512 412.0" fill="none" stroke="#2f855a" stroke-width="2" marker-end="url(#aInk)"/>
+<path d="M534 473.0 v-12 q0 -4 4 -4 h182 q4 0 4 4 v12 z" fill="#f8ecc9" stroke="#c98a12" stroke-width="1.4"/>
+<text class="sans" x="545.0" y="469.0" font-size="9.5" fill="#8f6209" font-weight="700" letter-spacing=".5">ONLY IF THE PAPER HAS MATHS</text>
+<rect x="520" y="473.0" width="400" height="78" rx="8" fill="#ffffff" stroke="#c98a12" stroke-width="1.6" filter="url(#lift)"/>
+<circle cx="558" cy="512.0" r="20" fill="#f8ecc9" stroke="#c98a12" stroke-width="1.6"/>
+<text class="serif" x="558.0" y="519.0" font-size="19" fill="#8f6209" font-weight="700" text-anchor="middle">Σ</text>
+<text class="serif" x="592.0" y="508.0" font-size="18" fill="#1f2a44" font-weight="700">Math</text>
+<text class="sans" x="592.0" y="529.0" font-size="12.5" fill="#5b6475">equations, variables, losses, derivations</text>
+<path class="ink" d="M424 362 C 482 362, 450 512.0, 512 512.0" fill="none" stroke="#c98a12" stroke-width="2" marker-end="url(#aInk)"/>
+<rect x="1010" y="234" width="222" height="120" rx="10" fill="#dcefe3" stroke="#2f855a" stroke-width="1.8"/>
+<path d="M1044 254l16 6v12c0 11-7 18-16 22c-9-4-16-11-16-22v-12z" fill="#ffffff" stroke="#2f855a" stroke-width="2"/><path d="M1037 273l5 5 9-10" fill="none" stroke="#2f855a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="serif" x="1072.0" y="272.0" font-size="18" fill="#22643f" font-weight="700">Verification</text>
+<text class="sans" x="1072.0" y="291.0" font-size="13" fill="#22643f">agent</text>
+<text class="sans" x="1028.0" y="322.0" font-size="12.5" fill="#1f2a44">fetches the evidence itself;</text>
+<text class="sans" x="1028.0" y="340.0" font-size="12.5" fill="#1f2a44">code checks quotes + numbers</text>
+<path d="M924 212.0 C 970 212.0, 960 294.0, 1004 294.0" fill="none" stroke="#2f855a" stroke-width="1.6" stroke-opacity=".75" marker-end="url(#aGreen)"/>
+<path d="M924 312.0 C 970 312.0, 960 294.0, 1004 294.0" fill="none" stroke="#2f855a" stroke-width="1.6" stroke-opacity=".75" marker-end="url(#aGreen)"/>
+<path d="M924 412.0 C 970 412.0, 960 294.0, 1004 294.0" fill="none" stroke="#2f855a" stroke-width="1.6" stroke-opacity=".75" marker-end="url(#aGreen)"/>
+<path d="M924 512.0 C 970 512.0, 960 294.0, 1004 294.0" fill="none" stroke="#2f855a" stroke-width="1.6" stroke-opacity=".75" marker-end="url(#aGreen)"/>
+<path class="ink" d="M1121.0 358 V406" stroke="#2f855a" stroke-width="2" marker-end="url(#aGreen)"/>
+<text class="serif" x="1131.0" y="388.0" font-size="12" fill="#22643f" font-weight="600" font-style="italic">verified findings</text>
+<rect x="1010" y="412" width="222" height="86" rx="10" fill="#f8ecc9" stroke="#c98a12" stroke-width="1.8"/>
+<text class="serif" x="1028.0" y="444.0" font-size="18" fill="#8f6209" font-weight="700">Synthesizer</text>
+<text class="sans" x="1028.0" y="467.0" font-size="12.5" fill="#1f2a44">writes the report from validated</text>
+<text class="sans" x="1028.0" y="485.0" font-size="12.5" fill="#1f2a44">findings. No model call.</text>
+<path d="M1040 228 C 1000 174, 930 103.0, 890 151.0" fill="none" stroke="#d4573a" stroke-width="1.8" stroke-dasharray="5 5" marker-end="url(#aCoral)"/>
+<text class="serif" x="1050.0" y="194.0" font-size="12.5" fill="#a8412a" font-weight="600" font-style="italic">failed to ground: retried</text>
 </svg>

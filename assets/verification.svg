@@ -1,94 +1,78 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="580" viewBox="0 0 1280 580" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="560" viewBox="0 0 1280 560" role="img" aria-labelledby="t d">
   <title id="t">How a claim earns a citation</title>
-  <desc id="d">A claim is re-checked by code: page in range, quote present, section resolves, numbers match. Quotes match exactly, after normalising, approximately (labelled), or not at all; an unverifiable quote is never shown as a citation but kept in the evidence appendix.</desc>
+  <desc id="d">A claim from an agent is re-checked by code: page in range, quote present, section resolves, numbers match. Quotes match exactly, after normalising, approximately (labelled), or not at all; an unverifiable quote is never shown as a citation but kept in the evidence appendix.</desc>
   <defs>
-    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset=".45" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-    <linearGradient id="gradH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a78bfa"/><stop offset=".5" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-    <linearGradient id="gradV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
-    <linearGradient id="gradC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
-    <radialGradient id="glowV" cx=".08" cy="-.05" r=".7"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".35"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></radialGradient>
-    <radialGradient id="glowC" cx="1" cy=".1" r=".6"><stop offset="0" stop-color="#22d3ee" stop-opacity=".2"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#94a3b8" stroke-opacity=".07"/></pattern>
-    <linearGradient id="fadeGrid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-    <mask id="gridMask"><rect width="1280" height="580" fill="url(#fadeGrid)"/></mask>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".5"/></filter>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22d3ee"/></marker>
-    <marker id="arrowV" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#c4b5fd"/></marker>
-    <marker id="arrowR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f43f5e"/></marker>
-    <marker id="arrowG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#22c55e"/></marker>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="#c9b98f" fill-opacity=".45"/></pattern>
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#5c4a24" flood-opacity=".18"/></filter>
+    <marker id="aInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1f2a44"/></marker>
+    <marker id="aCoral" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d4573a"/></marker>
+    <marker id="aGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f855a"/></marker>
     <style>
+      .serif{font-family:Georgia,"Iowan Old Style","Times New Roman",serif}
       .sans{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
       .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
-      .flow{stroke-dasharray:6 7;animation:flow 1.1s linear infinite}
-      @keyframes flow{to{stroke-dashoffset:-26}}
-      .pulse{animation:pulse 2.4s ease-in-out infinite}
-      @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
-      .grow{transform-box:fill-box;transform-origin:50% 100%;animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both}
-      @keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-      .pop{transform-box:fill-box;transform-origin:50% 50%;animation:pop 2.8s ease-in-out infinite}
-      @keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-      @media (prefers-reduced-motion:reduce){.flow,.pulse,.grow,.pop{animation:none}}
+      .ink{stroke-dasharray:7 6;animation:ink 1.4s linear infinite}
+      @keyframes ink{to{stroke-dashoffset:-26}}
+      .glow{animation:glow 2.6s ease-in-out infinite}
+      @keyframes glow{0%,100%{opacity:.6}50%{opacity:1}}
+      @media (prefers-reduced-motion:reduce){.ink,.glow{animation:none}}
     </style>
   </defs>
-  <rect width="1280" height="580" rx="24" fill="#060a14"/>
-  <rect width="1280" height="580" rx="24" fill="url(#glowV)"/>
-  <rect width="1280" height="580" rx="24" fill="url(#glowC)"/>
-  <rect width="1280" height="580" rx="24" fill="url(#grid)" mask="url(#gridMask)"/>
-  <rect x=".5" y=".5" width="1279" height="579" rx="24" fill="none" stroke="#94a3b8" stroke-opacity=".18"/>
+  <rect width="1280" height="560" rx="18" fill="#fbf7ef"/>
+  <rect width="1280" height="560" rx="18" fill="url(#dots)"/>
+  <rect x="1" y="1" width="1278" height="558" rx="17" fill="none" stroke="#e7dcc6" stroke-width="2"/>
 
-<text class="sans" x="48.0" y="70.0" font-size="30" fill="#e7ecf6" font-weight="800" letter-spacing="-.6">How a claim earns a citation</text><text class="sans" x="48.0" y="100.0" font-size="15.5" fill="#8d99b3">A citation appears only when its quote was found at the cited place. Failures are labelled, never hidden.</text>
-<text class="sans" x="48.0" y="150.0" font-size="12" fill="#67e8f9" font-weight="700" letter-spacing="1.4">1 · CLAIM FROM AN AGENT</text>
-<text class="sans" x="428.0" y="150.0" font-size="12" fill="#c4b5fd" font-weight="700" letter-spacing="1.4">2 · CODE CHECKS</text>
-<text class="sans" x="836.0" y="150.0" font-size="12" fill="#86efac" font-weight="700" letter-spacing="1.4">3 · QUOTE MATCH</text>
-<rect x="48" y="166" width="340" height="300" rx="16" fill="#0d1424" stroke="#22d3ee" stroke-opacity=".45" filter="url(#shadow)"/>
-<text class="sans" x="70.0" y="204.0" font-size="11" fill="#67e8f9" font-weight="700" letter-spacing="1.3">EXPERIMENTS AGENT</text>
-<text class="sans" x="70.0" y="240.0" font-size="18" fill="#e7ecf6" font-weight="800">SRT-Large reaches 81.4 F1</text>
-<text class="sans" x="70.0" y="264.0" font-size="18" fill="#e7ecf6" font-weight="800">on NarrativeQA.</text>
-<rect x="70" y="286" width="296" height="92" rx="10" fill="#111a2e" stroke="#94a3b8" stroke-opacity=".18"/>
-<text class="mono" x="84.0" y="311.0" font-size="12.5" fill="#8d99b3">cites [S3] →</text>
-<text class="mono" x="84.0" y="334.0" font-size="12.5" fill="#67e8f9">p. 4 · §4.2 Main Results</text>
-<text class="mono" x="84.0" y="357.0" font-size="12.5" fill="#67e8f9">Table 1</text>
-<text class="sans" x="70.0" y="410.0" font-size="12.5" fill="#8d99b3">The verifier fetches its own evidence,</text>
-<text class="sans" x="70.0" y="429.0" font-size="12.5" fill="#8d99b3">not the agent's, before it rules.</text>
-<rect x="428" y="166" width="368" height="300" rx="16" fill="#0d1424" stroke="#8b5cf6" stroke-opacity=".45" filter="url(#shadow)"/>
-<circle cx="461" cy="207" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
-<path d="M456 207l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="482.0" y="212.0" font-size="14" fill="#e7ecf6">Page is inside the PDF</text>
-<circle cx="461" cy="247" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
-<path d="M456 247l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="482.0" y="252.0" font-size="14" fill="#e7ecf6">Quote occurs in the cited text</text>
-<circle cx="461" cy="287" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
-<path d="M456 287l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="482.0" y="292.0" font-size="14" fill="#e7ecf6">Section resolves in the index</text>
-<circle cx="461" cy="327" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
-<path d="M456 327l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="482.0" y="332.0" font-size="14" fill="#e7ecf6">Numbers match their evidence</text>
-<circle cx="461" cy="367" r="11" fill="#22c55e" fill-opacity=".16" stroke="#22c55e" stroke-opacity=".6"/>
-<path d="M456 367l3.5 3.5 6.5-7" fill="none" stroke="#86efac" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="sans" x="482.0" y="372.0" font-size="14" fill="#e7ecf6">Fields and confidence are valid</text>
-<line x1="450" y1="416" x2="774" y2="416" stroke="#94a3b8" stroke-opacity=".2"/>
-<text class="sans" x="450.0" y="442.0" font-size="12.5" fill="#c4b5fd" font-weight="600">Code can only lower the model's verdict, never raise it.</text>
-<rect x="836" y="166" width="396" height="300" rx="16" fill="#0d1424" stroke="#22c55e" stroke-opacity=".45" filter="url(#shadow)"/>
-<text class="sans" x="858.0" y="210.0" font-size="15" fill="#e7ecf6" font-weight="700">Exact</text>
-<text class="sans" x="1210.0" y="210.0" font-size="12.5" fill="#86efac" font-weight="600" text-anchor="end">cited</text>
-<rect x="858" y="220" width="352" height="10" rx="5" fill="#111a2e" stroke="#94a3b8" stroke-opacity=".15"/>
-<rect x="858" y="220" width="352" height="10" rx="5" fill="#22c55e" fill-opacity=".85"/>
-<text class="sans" x="858.0" y="272.0" font-size="15" fill="#e7ecf6" font-weight="700">Normalised</text>
-<text class="sans" x="1210.0" y="272.0" font-size="12.5" fill="#86efac" font-weight="600" text-anchor="end">cited</text>
-<rect x="858" y="282" width="352" height="10" rx="5" fill="#111a2e" stroke="#94a3b8" stroke-opacity=".15"/>
-<rect x="858" y="282" width="289" height="10" rx="5" fill="#22c55e" fill-opacity=".85"/>
-<text class="sans" x="858.0" y="334.0" font-size="15" fill="#e7ecf6" font-weight="700">Approximate</text>
-<text class="sans" x="1210.0" y="334.0" font-size="12.5" fill="#fcd34d" font-weight="600" text-anchor="end">cited, labelled</text>
-<rect x="858" y="344" width="352" height="10" rx="5" fill="#111a2e" stroke="#94a3b8" stroke-opacity=".15"/>
-<rect x="858" y="344" width="194" height="10" rx="5" fill="#f59e0b" fill-opacity=".85"/>
-<text class="sans" x="858.0" y="396.0" font-size="15" fill="#e7ecf6" font-weight="700">Unverifiable</text>
-<text class="sans" x="1210.0" y="396.0" font-size="12.5" fill="#fda4af" font-weight="600" text-anchor="end">not cited</text>
-<rect x="858" y="406" width="352" height="10" rx="5" fill="#111a2e" stroke="#94a3b8" stroke-opacity=".15"/>
-<rect x="858" y="406" width="42" height="10" rx="5" fill="#f43f5e" fill-opacity=".85"/>
-<text class="sans" x="858.0" y="448.0" font-size="11.5" fill="#8d99b3" font-style="italic">bar = confidence kept after the match</text>
-<path class="flow" d="M392 316 H420" stroke="#22d3ee" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
-<path class="flow" d="M800 316 H828" stroke="#c4b5fd" stroke-width="2" fill="none" marker-end="url(#arrowV)"/>
-<rect x="48" y="506" width="1184" height="44" rx="12" fill="#22c55e" fill-opacity=".08" stroke="#22c55e" stroke-opacity=".45"/>
-<text class="sans" x="70.0" y="533.5" font-size="12" fill="#86efac" font-weight="800" letter-spacing="1.2">ANNOTATE AND DOWNGRADE</text>
-<text class="sans" x="292.0" y="533.5" font-size="13.5" fill="#d1fae5">A citation that fails is never silently deleted: it stays in the evidence appendix, marked unverifiable.</text>
+<text class="serif" x="56.0" y="74.0" font-size="32" fill="#1f2a44" font-weight="700" letter-spacing="-.3">How a claim earns a citation</text><rect x="56" y="86" width="56" height="4" rx="2" fill="#d4573a"/><text class="sans" x="56.0" y="116.0" font-size="15.5" fill="#5b6475">A citation appears only when its quote was found at the cited place. Failures are labelled, never hidden.</text>
+<rect x="56" y="164" width="330" height="270" rx="4" fill="#ffffff" stroke="#e7dcc6" filter="url(#lift)" transform="rotate(-1.5 221.0 299.0)"/>
+<text class="sans" x="78.0" y="204.0" font-size="12.5" fill="#1f4f82" font-weight="700" letter-spacing="1">1 · AN AGENT CLAIMS</text>
+<text class="serif" x="74.0" y="272.0" font-size="70" fill="#2b6cb0" font-weight="700" fill-opacity=".35">“</text>
+<text class="serif" x="112.0" y="256.0" font-size="20" fill="#1f2a44" font-weight="700">SRT-Large reaches</text>
+<text class="serif" x="112.0" y="282.0" font-size="20" fill="#1f2a44" font-weight="700">81.4 F1 on NarrativeQA.”</text>
+<line x1="78" y1="310" x2="364" y2="310" stroke="#e7dcc6"/>
+<text class="mono" x="78.0" y="336.0" font-size="12.5" fill="#1f4f82" font-weight="600">cites [S3] → p. 4, §4.2, Table 1</text>
+<text class="serif" x="78.0" y="376.0" font-size="13.5" fill="#5b6475" font-style="italic">The verifier then fetches its own</text>
+<text class="serif" x="78.0" y="396.0" font-size="13.5" fill="#5b6475" font-style="italic">evidence, not the agent's.</text>
+<rect x="450" y="164" width="370" height="270" rx="4" fill="#fffdf6" stroke="#e7dcc6" filter="url(#lift)"/>
+<line x1="494" y1="164" x2="494" y2="434" stroke="#d4573a" stroke-opacity=".45"/>
+<text class="sans" x="510.0" y="200.0" font-size="12.5" fill="#22643f" font-weight="700" letter-spacing="1">2 · CHECKED BY CODE</text>
+<line x1="450" y1="256" x2="820" y2="256" stroke="#2b6cb0" stroke-opacity=".22"/>
+<rect x="510" y="232" width="17" height="17" rx="3" fill="#ffffff" stroke="#2f855a" stroke-width="1.8"/>
+<path d="M513 240l4 4 8-10" fill="none" stroke="#2f855a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="serif" x="538.0" y="246.0" font-size="14.5" fill="#1f2a44">page is inside the PDF</text>
+<line x1="450" y1="290" x2="820" y2="290" stroke="#2b6cb0" stroke-opacity=".22"/>
+<rect x="510" y="266" width="17" height="17" rx="3" fill="#ffffff" stroke="#2f855a" stroke-width="1.8"/>
+<path d="M513 274l4 4 8-10" fill="none" stroke="#2f855a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="serif" x="538.0" y="280.0" font-size="14.5" fill="#1f2a44">quote occurs in the cited text</text>
+<line x1="450" y1="324" x2="820" y2="324" stroke="#2b6cb0" stroke-opacity=".22"/>
+<rect x="510" y="300" width="17" height="17" rx="3" fill="#ffffff" stroke="#2f855a" stroke-width="1.8"/>
+<path d="M513 308l4 4 8-10" fill="none" stroke="#2f855a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="serif" x="538.0" y="314.0" font-size="14.5" fill="#1f2a44">section resolves in the index</text>
+<line x1="450" y1="358" x2="820" y2="358" stroke="#2b6cb0" stroke-opacity=".22"/>
+<rect x="510" y="334" width="17" height="17" rx="3" fill="#ffffff" stroke="#2f855a" stroke-width="1.8"/>
+<path d="M513 342l4 4 8-10" fill="none" stroke="#2f855a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="serif" x="538.0" y="348.0" font-size="14.5" fill="#1f2a44">numbers match their evidence</text>
+<line x1="450" y1="392" x2="820" y2="392" stroke="#2b6cb0" stroke-opacity=".22"/>
+<rect x="510" y="368" width="17" height="17" rx="3" fill="#ffffff" stroke="#2f855a" stroke-width="1.8"/>
+<path d="M513 376l4 4 8-10" fill="none" stroke="#2f855a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="serif" x="538.0" y="382.0" font-size="14.5" fill="#1f2a44">fields and confidence are valid</text>
+<text class="sans" x="510.0" y="414.0" font-size="12.5" fill="#22643f" font-weight="600">Code can lower the model's verdict, never raise it.</text>
+<text class="sans" x="884.0" y="168.0" font-size="12.5" fill="#8f6209" font-weight="700" letter-spacing="1">3 · HOW WELL THE QUOTE MATCHED</text>
+<rect x="884" y="232" width="82" height="182" rx="3" fill="#dcefe3" stroke="#2f855a" stroke-width="1.6"/>
+<text class="serif" x="925.0" y="208.0" font-size="13" fill="#1f2a44" font-weight="700" text-anchor="middle">exact</text>
+<text class="sans" x="925.0" y="224.0" font-size="11.5" fill="#22643f" font-weight="600" text-anchor="middle">cited</text>
+<rect x="972" y="272" width="82" height="142" rx="3" fill="#dcefe3" stroke="#2f855a" stroke-width="1.6"/>
+<text class="serif" x="1013.0" y="248.0" font-size="13" fill="#1f2a44" font-weight="700" text-anchor="middle">normalised</text>
+<text class="sans" x="1013.0" y="264.0" font-size="11.5" fill="#22643f" font-weight="600" text-anchor="middle">cited</text>
+<rect x="1060" y="318" width="82" height="96" rx="3" fill="#f8ecc9" stroke="#c98a12" stroke-width="1.6"/>
+<text class="serif" x="1101.0" y="294.0" font-size="13" fill="#1f2a44" font-weight="700" text-anchor="middle">approximate</text>
+<text class="sans" x="1101.0" y="310.0" font-size="11.5" fill="#8f6209" font-weight="600" text-anchor="middle">labelled</text>
+<rect x="1148" y="374" width="82" height="40" rx="3" fill="#fbe4dc" stroke="#d4573a" stroke-width="1.6"/>
+<text class="serif" x="1189.0" y="350.0" font-size="13" fill="#1f2a44" font-weight="700" text-anchor="middle">unverifiable</text>
+<text class="sans" x="1189.0" y="366.0" font-size="11.5" fill="#a8412a" font-weight="600" text-anchor="middle">not cited</text>
+<line x1="878" y1="414" x2="1236" y2="414" stroke="#1f2a44" stroke-width="1.6"/>
+<text class="serif" x="884.0" y="436.0" font-size="12" fill="#5b6475" font-style="italic">step height = confidence kept</text>
+<path class="ink" d="M394 294 H438" stroke="#1f2a44" stroke-width="2" marker-end="url(#aInk)"/>
+<path class="ink" d="M828 294 H868" stroke="#1f2a44" stroke-width="2" marker-end="url(#aInk)"/>
+<g transform="rotate(-3 180 508)"><rect x="60" y="488" width="244" height="40" rx="4" fill="none" stroke="#d4573a" stroke-width="2.4"/><text class="sans" x="182.0" y="514.0" font-size="14" fill="#d4573a" font-weight="800" text-anchor="middle" letter-spacing="1.6">ANNOTATE &amp; DOWNGRADE</text></g>
+<text class="serif" x="330.0" y="514.0" font-size="15" fill="#1f2a44">A citation that fails is never silently deleted: it stays in the evidence appendix, marked unverifiable.</text>
 </svg>

@@ -1,6 +1,7 @@
 """Draw PaperMind's README graphics. Run from the repo root: python assets/make_svgs.py assets
 
-Shared style and helpers come from the AEIDS project's generator (same author)."""
+A "paper and ink" look: cream paper, navy ink, serif headings, a highlighter, margin notes.
+"""
 import math
 import sys
 from pathlib import Path
@@ -9,19 +10,18 @@ from xml.sax.saxutils import escape
 OUT = Path(sys.argv[1])
 OUT.mkdir(parents=True, exist_ok=True)
 
-BG, INK, MUTED, SOFT = "#060a14", "#e7ecf6", "#8d99b3", "#a9b4cc"
-CARD, LINE = "#0d1424", "#94a3b8"
-VIOLET, VIOLET_T = "#8b5cf6", "#c4b5fd"
-CYAN, CYAN_T = "#22d3ee", "#67e8f9"
-TEAL, TEAL_T = "#2dd4bf", "#5eead4"
-GREEN, GREEN_T = "#22c55e", "#86efac"
-ROSE, ROSE_T = "#f43f5e", "#fda4af"
-AMBER, AMBER_T = "#f59e0b", "#fcd34d"
-TINT = {CYAN: CYAN_T, TEAL: TEAL_T, VIOLET: VIOLET_T, GREEN: GREEN_T, ROSE: ROSE_T, AMBER: AMBER_T}
+PAPER, SHEET, INK, MUTED, RULE = "#fbf7ef", "#ffffff", "#1f2a44", "#5b6475", "#e7dcc6"
+CORAL, CORAL_D = "#d4573a", "#a8412a"
+GREEN, GREEN_D = "#2f855a", "#22643f"
+MUSTARD, MUSTARD_D = "#c98a12", "#8f6209"
+BLUE, BLUE_D = "#2b6cb0", "#1f4f82"
+HILITE = "#fde68a"
+SOFT = {CORAL: "#fbe4dc", GREEN: "#dcefe3", MUSTARD: "#f8ecc9", BLUE: "#dce8f5", INK: "#e6e8ee"}
+DARK = {CORAL: CORAL_D, GREEN: GREEN_D, MUSTARD: MUSTARD_D, BLUE: BLUE_D, INK: INK}
 
 
-def w(text, size, bold=False, mono=False):
-    k = 0.61 if mono else (0.57 if bold else 0.53)
+def w(text, size, bold=False, mono=False, serif=False):
+    k = 0.61 if mono else (0.55 if serif else (0.57 if bold else 0.53))
     return len(text) * size * k
 
 
@@ -34,392 +34,307 @@ def t(x, y, s, size=14, fill=INK, weight=None, anchor=None, cls="sans", extra=""
     return f'<text class="{cls}" x="{x:.1f}" y="{y:.1f}"{a}{extra}>{escape(s)}</text>'
 
 
-def chip(x, y, s, color, tcolor, size=13, h=30, pad=14, bold=True):
-    cw = w(s, size, bold) + 2 * pad
-    return (f'<rect x="{x:.1f}" y="{y}" width="{cw:.0f}" height="{h}" rx="{h/2}" fill="{color}" fill-opacity=".13" '
-            f'stroke="{color}" stroke-opacity=".5"/>'
-            + t(x + cw / 2, y + h / 2 + size * 0.36, s, size, tcolor, "600" if bold else None, "middle")), cw
-
-
 def head(W, H, title, desc):
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-labelledby="t d">
   <title id="t">{escape(title)}</title>
   <desc id="d">{escape(desc)}</desc>
   <defs>
-    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset=".45" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-    <linearGradient id="gradH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a78bfa"/><stop offset=".5" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
-    <linearGradient id="gradV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
-    <linearGradient id="gradC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
-    <radialGradient id="glowV" cx=".08" cy="-.05" r=".7"><stop offset="0" stop-color="#8b5cf6" stop-opacity=".35"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></radialGradient>
-    <radialGradient id="glowC" cx="1" cy=".1" r=".6"><stop offset="0" stop-color="#22d3ee" stop-opacity=".2"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#94a3b8" stroke-opacity=".07"/></pattern>
-    <linearGradient id="fadeGrid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-    <mask id="gridMask"><rect width="{W}" height="{H}" fill="url(#fadeGrid)"/></mask>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".5"/></filter>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{CYAN}"/></marker>
-    <marker id="arrowV" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{VIOLET_T}"/></marker>
-    <marker id="arrowR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{ROSE}"/></marker>
-    <marker id="arrowG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{GREEN}"/></marker>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="#c9b98f" fill-opacity=".45"/></pattern>
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#5c4a24" flood-opacity=".18"/></filter>
+    <marker id="aInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{INK}"/></marker>
+    <marker id="aCoral" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{CORAL}"/></marker>
+    <marker id="aGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="{GREEN}"/></marker>
     <style>
+      .serif{{font-family:Georgia,"Iowan Old Style","Times New Roman",serif}}
       .sans{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}}
       .mono{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}}
-      .flow{{stroke-dasharray:6 7;animation:flow 1.1s linear infinite}}
-      @keyframes flow{{to{{stroke-dashoffset:-26}}}}
-      .pulse{{animation:pulse 2.4s ease-in-out infinite}}
-      @keyframes pulse{{0%,100%{{opacity:.45}}50%{{opacity:1}}}}
-      .grow{{transform-box:fill-box;transform-origin:50% 100%;animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both}}
-      @keyframes grow{{from{{transform:scaleY(0)}}to{{transform:scaleY(1)}}}}
-      .pop{{transform-box:fill-box;transform-origin:50% 50%;animation:pop 2.8s ease-in-out infinite}}
-      @keyframes pop{{0%,100%{{transform:scale(1)}}50%{{transform:scale(1.08)}}}}
-      @media (prefers-reduced-motion:reduce){{.flow,.pulse,.grow,.pop{{animation:none}}}}
+      .ink{{stroke-dasharray:7 6;animation:ink 1.4s linear infinite}}
+      @keyframes ink{{to{{stroke-dashoffset:-26}}}}
+      .glow{{animation:glow 2.6s ease-in-out infinite}}
+      @keyframes glow{{0%,100%{{opacity:.6}}50%{{opacity:1}}}}
+      @media (prefers-reduced-motion:reduce){{.ink,.glow{{animation:none}}}}
     </style>
   </defs>
-  <rect width="{W}" height="{H}" rx="24" fill="{BG}"/>
-  <rect width="{W}" height="{H}" rx="24" fill="url(#glowV)"/>
-  <rect width="{W}" height="{H}" rx="24" fill="url(#glowC)"/>
-  <rect width="{W}" height="{H}" rx="24" fill="url(#grid)" mask="url(#gridMask)"/>
-  <rect x=".5" y=".5" width="{W-1}" height="{H-1}" rx="24" fill="none" stroke="{LINE}" stroke-opacity=".18"/>
+  <rect width="{W}" height="{H}" rx="18" fill="{PAPER}"/>
+  <rect width="{W}" height="{H}" rx="18" fill="url(#dots)"/>
+  <rect x="1" y="1" width="{W-2}" height="{H-2}" rx="17" fill="none" stroke="{RULE}" stroke-width="2"/>
 '''
 
 
-def card(x, y, cw, ch, stroke=LINE, sop=".22", fill=CARD, rx=16, shadow=True):
-    f = ' filter="url(#shadow)"' if shadow else ""
-    return f'<rect x="{x}" y="{y}" width="{cw}" height="{ch}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-opacity="{sop}"{f}/>'
+def heading(title, sub, x=56, y=74):
+    return (t(x, y, title, 32, INK, "700", cls="serif", extra=' letter-spacing="-.3"')
+            + f'<rect x="{x}" y="{y+12}" width="56" height="4" rx="2" fill="{CORAL}"/>'
+            + t(x, y + 42, sub, 15.5, MUTED))
 
 
-def title_block(title, sub, y=70):
-    return t(48, y, title, 30, INK, "800", extra=' letter-spacing="-.6"') + t(48, y + 30, sub, 15.5, MUTED)
+def tag(x, y, s, c, size=13):
+    """An outlined label with a coloured bar on the left (not a pill)."""
+    tw = w(s, size, True) + 30
+    return (f'<rect x="{x}" y="{y}" width="{tw:.0f}" height="32" rx="5" fill="{SHEET}" stroke="{c}" stroke-width="1.4"/>'
+            f'<rect x="{x}" y="{y}" width="6" height="32" rx="3" fill="{c}"/>'
+            + t(x + 18, y + 21, s, size, DARK[c], "600")), tw
 
 
-def icon(kind, cx, cy, c, sw=2.2):
-    st = f'fill="none" stroke="{c}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"'
-    if kind == "upload":
-        return (f'<path d="M{cx-13} {cy-18}h17l9 9v27h-26z" {st}/><path d="M{cx+4} {cy-18}v9h9" {st}/>'
-                f'<path d="M{cx-0.5} {cy+12}v-14M{cx-6} {cy+3}l5.5-5.5 5.5 5.5" {st}/>')
-    if kind == "parse":
-        return (f'<rect x="{cx-17}" y="{cy-18}" width="34" height="36" rx="3" {st}/>'
-                f'<path d="M{cx-17} {cy-8}h34M{cx-17} {cy+2}h34M{cx-17} {cy+11}h34M{cx-4} {cy-8}v26" {st}/>')
-    if kind == "index":
-        return (f'<circle cx="{cx-3}" cy="{cy-3}" r="12" {st}/><path d="M{cx+6} {cy+6}l9 9" {st}/>'
-                f'<path d="M{cx-9} {cy-3}h12M{cx-9} {cy+2}h8" {st}/>')
-    if kind == "plan":
-        return (f'<rect x="{cx-6}" y="{cy-19}" width="12" height="10" rx="2" {st}/>'
-                f'<rect x="{cx-20}" y="{cy+9}" width="12" height="10" rx="2" {st}/>'
-                f'<rect x="{cx-6}" y="{cy+9}" width="12" height="10" rx="2" {st}/>'
-                f'<rect x="{cx+8}" y="{cy+9}" width="12" height="10" rx="2" {st}/>'
-                f'<path d="M{cx} {cy-9}v18M{cx} {cy}h-14v9M{cx} {cy}h14v9" {st}/>')
-    if kind == "calc":
-        return (f'<rect x="{cx-14}" y="{cy-19}" width="28" height="38" rx="4" {st}/>'
-                f'<rect x="{cx-8}" y="{cy-13}" width="16" height="7" rx="1.5" {st}/>'
-                + "".join(f'<circle cx="{cx-7+dx*7}" cy="{cy+3+dy*8}" r="1.8" fill="{c}"/>'
-                          for dx in range(3) for dy in range(2)))
-    if kind == "verify":
-        return (f'<path d="M{cx} {cy-19}l15 5v11c0 10-6.5 16.5-15 20c-8.5-3.5-15-10-15-20v-11z" {st}/>'
-                f'<path d="M{cx-7} {cy}l5 5l9-10" {st}/>')
-    if kind == "report":
-        return (f'<path d="M{cx-14} {cy-19}h28v38h-28z" {st}/>'
-                f'<path d="M{cx-8} {cy-9}l2.5 2.5 4-4M{cx+1} {cy-8}h7M{cx-8} {cy+1}l2.5 2.5 4-4M{cx+1} {cy+2}h7M{cx-8} {cy+12}h16" {st}/>')
-    if kind == "hex":
-        pts = " ".join(f"{cx+19*math.cos(k*math.pi/3+math.pi/6):.1f},{cy+19*math.sin(k*math.pi/3+math.pi/6):.1f}"
-                       for k in range(6))
-        return f'<polygon points="{pts}" {st}/><circle cx="{cx}" cy="{cy}" r="5" {st}/>'
-    if kind == "user":
-        return (f'<circle cx="{cx}" cy="{cy-7}" r="7.5" {st}/><path d="M{cx-14} {cy+17}c0-9 6-14 14-14s14 5 14 14" {st}/>')
-    if kind == "db":
-        return (f'<ellipse cx="{cx}" cy="{cy-10}" rx="13" ry="5" {st}/>'
-                f'<path d="M{cx-13} {cy-10}v20c0 3 6 5 13 5s13-2 13-5v-20M{cx-13} {cy}c0 3 6 5 13 5s13-2 13-5" {st}/>')
-    raise ValueError(kind)
-
-
-def icon_tile(kind, x, y, c, size=56):
-    return (f'<rect x="{x}" y="{y}" width="{size}" height="{size}" rx="14" fill="{c}" fill-opacity=".12" '
-            f'stroke="{c}" stroke-opacity=".45"/>' + icon(kind, x + size / 2, y + size / 2, c))
-
-
-def icon2(kind, cx, cy, c, sw=2.2):
-    """Extra icons for PaperMind; everything else comes from icon()."""
-    st = f'fill="none" stroke="{c}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"'
-    if kind == "chart":
-        return (f'<path d="M{cx-17} {cy-18}v36h34" {st}/>'
-                f'<path d="M{cx-10} {cy+10}v-8M{cx-2} {cy+10}v-16M{cx+6} {cy+10}v-11M{cx+14} {cy+10}v-22" {st}/>')
-    if kind == "sigma":
-        return f'<path d="M{cx+13} {cy-16}h-26l14 16l-14 16h26" {st}/>'
-    if kind == "paper":
-        return (f'<path d="M{cx-14} {cy-19}h20l9 9v29h-29z" {st}/><path d="M{cx+6} {cy-19}v9h9" {st}/>'
-                f'<path d="M{cx-8} {cy-4}h16M{cx-8} {cy+3}h16M{cx-8} {cy+10}h10" {st}/>')
-    return icon(kind, cx, cy, c, sw)
-
-
-def tile(kind, x, y, c, size=56):
-    return (f'<rect x="{x}" y="{y}" width="{size}" height="{size}" rx="14" fill="{c}" fill-opacity=".12" '
-            f'stroke="{c}" stroke-opacity=".45"/>' + icon2(kind, x + size / 2, y + size / 2, c))
-
-
+# =========================================================================== banner
 TABLE = [("Dense-Large", "76.2", "61.4"), ("Longformer-Large", "77.9", "63.0"), ("BM25 + Reader", "74.1", "59.8"),
          ("SRT-Base", "79.3", "65.1"), ("SRT-Large", "81.4", "68.7")]
 
 
-def paper_page(x, y, pw, ph):
-    """A white research-paper page: title, section 4.2 and Table 1 with the SRT-Large row highlighted."""
-    s = [f'<g filter="url(#shadow)"><rect x="{x}" y="{y}" width="{pw}" height="{ph}" rx="12" fill="#f8fafc"/></g>']
-    ix, iw = x + 20, pw - 40
-    s.append(f'<rect x="{ix+iw*0.08:.0f}" y="{y+22}" width="{iw*0.84:.0f}" height="9" rx="4.5" fill="#cbd5e1"/>')
-    s.append(f'<rect x="{ix+iw*0.22:.0f}" y="{y+37}" width="{iw*0.56:.0f}" height="7" rx="3.5" fill="#e2e8f0"/>')
-    for k, frac in enumerate((0.97, 0.92, 0.95, 0.7)):
-        s.append(f'<rect x="{ix}" y="{y+60+k*12}" width="{iw*frac:.0f}" height="6" rx="3" fill="#e2e8f0"/>')
-    s.append(t(ix, y + 128, "4.2  Main Results", 11.5, "#334155", "800"))
-    s.append(t(ix, y + 146, "Table 1: Main results on long-document QA.", 8.6, "#64748b", None, extra=' font-style="italic"'))
-    ty = y + 156
-    c1, c2 = ix + iw * 0.70, ix + iw
-    s.append(f'<rect x="{ix}" y="{ty}" width="{iw}" height="22" fill="#eef2ff"/>')
-    s.append(t(ix + 6, ty + 15, "Model", 9.2, "#475569", "700"))
-    s.append(t(c1, ty + 15, "NQA F1", 9.2, "#475569", "700", "end"))
-    s.append(t(c2 - 6, ty + 15, "QuALITY", 9.2, "#475569", "700", "end"))
-    hl = None
+def paper_sheet(x, y, pw, ph):
+    """A research-paper page: title, section 4.2 and Table 1, with the SRT-Large row highlighted."""
+    s = [f'<rect x="{x}" y="{y}" width="{pw}" height="{ph}" rx="4" fill="{SHEET}" stroke="{RULE}" filter="url(#lift)"/>']
+    ix, iw = x + 24, pw - 48
+    s.append(t(x + pw / 2, y + 34, "Sparse Routing Transformers", 13, INK, "700", "middle", cls="serif"))
+    s.append(t(x + pw / 2, y + 51, "for Long-Document Question Answering", 10.5, MUTED, None, "middle", cls="serif"))
+    for k, frac in enumerate((1.0, 0.96, 0.99, 0.62)):
+        s.append(f'<line x1="{ix}" y1="{y+72+k*11}" x2="{ix+iw*frac:.0f}" y2="{y+72+k*11}" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>')
+    s.append(t(ix, y + 132, "4.2  Main Results", 12, INK, "700", cls="serif"))
+    s.append(t(ix, y + 150, "Table 1: Main results on long-document QA.", 9, MUTED, None, cls="serif", extra=' font-style="italic"'))
+    ty = y + 160
+    c1, c2 = ix + iw * 0.72, ix + iw
+    s.append(f'<line x1="{ix}" y1="{ty}" x2="{ix+iw}" y2="{ty}" stroke="{INK}" stroke-width="1.2"/>')
+    s.append(t(ix + 2, ty + 15, "Model", 9.4, INK, "700", cls="serif"))
+    s.append(t(c1, ty + 15, "NQA F1", 9.4, INK, "700", "end", cls="serif"))
+    s.append(t(c2 - 2, ty + 15, "QuALITY", 9.4, INK, "700", "end", cls="serif"))
+    s.append(f'<line x1="{ix}" y1="{ty+21}" x2="{ix+iw}" y2="{ty+21}" stroke="{INK}" stroke-width=".7"/>')
+    anchor = None
     for i, (m, f1, q) in enumerate(TABLE):
-        ry = ty + 22 + i * 22
+        ry = ty + 22 + i * 21
         last = i == len(TABLE) - 1
         if last:
-            s.append(f'<rect class="pulse" x="{ix-4}" y="{ry+1}" width="{iw+8}" height="21" rx="4" fill="{CYAN}" '
-                     f'fill-opacity=".14" stroke="{CYAN}" stroke-width="1.6" stroke-dasharray="4 3"/>')
-            hl = (ix + iw + 4, ry + 12)
-        bold = "700" if last else None
-        s.append(t(ix + 6, ry + 15, m, 9.2, "#334155", bold))
-        s.append(t(c1, ry + 15, f1, 9.2, "#0f172a" if last else "#334155", bold, "end"))
-        s.append(t(c2 - 6, ry + 15, q, 9.2, "#334155", bold, "end"))
-        s.append(f'<line x1="{ix}" y1="{ry+22}" x2="{ix+iw}" y2="{ry+22}" stroke="#eef2f7"/>')
-    py = ty + 22 + len(TABLE) * 22 + 18
-    for k, frac in enumerate((0.95, 0.88, 0.6)):
-        if py + k * 12 + 6 < y + ph - 26:
-            s.append(f'<rect x="{ix}" y="{py+k*12}" width="{iw*frac:.0f}" height="6" rx="3" fill="#e2e8f0"/>')
-    s.append(t(ix + iw, y + ph - 12, "p. 4", 9.5, "#94a3b8", None, "end"))
-    return "\n".join(s), hl
+            s.append(f'<rect class="glow" x="{ix-3}" y="{ry+2}" width="{iw+6}" height="18" rx="3" fill="{HILITE}"/>')
+            anchor = (ix + iw + 6, ry + 11)
+        b = "700" if last else None
+        s.append(t(ix + 2, ry + 15, m, 9.4, INK, b, cls="serif"))
+        s.append(t(c1, ry + 15, f1, 9.4, INK, b, "end", cls="serif"))
+        s.append(t(c2 - 2, ry + 15, q, 9.4, INK, b, "end", cls="serif"))
+    end = ty + 22 + len(TABLE) * 21 + 2
+    s.append(f'<line x1="{ix}" y1="{end}" x2="{ix+iw}" y2="{end}" stroke="{INK}" stroke-width="1.2"/>')
+    for k, frac in enumerate((1.0, 0.9, 0.55)):
+        if end + 18 + k * 11 < y + ph - 28:
+            s.append(f'<line x1="{ix}" y1="{end+18+k*11}" x2="{ix+iw*frac:.0f}" y2="{end+18+k*11}" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>')
+    s.append(t(x + pw / 2, y + ph - 14, "4", 10, MUTED, None, "middle", cls="serif"))
+    return "\n".join(s), anchor
 
 
-# =========================================================================== banner
 def banner():
     W, H = 1280, 460
     s = [head(W, H, "PaperMind: citation-grounded multi-agent analysis of research papers",
-              "A research-paper page whose Table 1 row is cited by a supported claim: the quote was found on the "
-              "page and the number matches its evidence.")]
-    s.append('<rect x="64" y="64" width="52" height="52" rx="14" fill="url(#grad)"/>')
-    s.append(icon2("paper", 90, 91, "#fff", 2.4))
-    s.append(t(132, 86, "PaperMind", 17, INK, "700", extra=' letter-spacing=".5"'))
-    s.append(t(132, 107, "Citation-grounded analysis of research papers", 14, MUTED))
-    s.append(t(64, 190, "Every claim, checked", 52, INK, "800", extra=' letter-spacing="-1.5"'))
-    s.append(t(64, 250, "against the page.", 52, "url(#gradH)", "800", extra=' letter-spacing="-1.5"'))
-    s.append(t(64, 298, "Specialist agents read one research paper; a verifier", 19, SOFT))
-    s.append(t(64, 324, "re-checks every high-impact claim against the PDF.", 19, SOFT))
+              "A research-paper page with its Table 1 row highlighted, and a margin note: the claim that SRT-Large "
+              "reaches 81.4 F1 on NarrativeQA is supported, its quote was found and its number matches.")]
+    s.append(f'<circle cx="86" cy="80" r="24" fill="{CORAL}"/>')
+    s.append(f'<path d="M73 72c5-3 9-3 13 0v17c-4-3-8-3-13 0zM99 72c-5-3-9-3-13 0v17c4-3 8-3 13 0z" fill="none" '
+             f'stroke="#fff" stroke-width="2" stroke-linejoin="round"/>')
+    s.append(t(122, 76, "PaperMind", 20, INK, "700", cls="serif"))
+    s.append(t(122, 97, "Citation-grounded analysis of research papers", 13.5, MUTED))
+    s.append(t(64, 186, "Every claim, checked", 46, INK, "700", cls="serif", extra=' letter-spacing="-.8"'))
+    hw = len("against the page.") * 46 * 0.5
+    s.append(f'<rect x="60" y="222" width="{hw+6:.0f}" height="24" rx="4" fill="{HILITE}"/>')
+    s.append(t(64, 242, "against the page.", 46, CORAL_D, "700", cls="serif", extra=' letter-spacing="-.8"'))
+    s.append(t(64, 294, "Specialist agents read one research paper. A verifier", 18.5, MUTED))
+    s.append(t(64, 320, "re-checks every high-impact claim against the PDF.", 18.5, MUTED))
     x = 64
-    for label, c in (("Page-level citations", VIOLET), ("Deterministic checks", CYAN), ("Bounded retries", TEAL)):
-        g, cw = chip(x, 358, label, c, TINT[c], 13.5, 34, 16)
+    for label, c in (("Page-level citations", BLUE), ("Deterministic checks", GREEN), ("Bounded retries", CORAL)):
+        g, tw = tag(x, 356, label, c)
         s.append(g)
-        x += cw + 12
-    page, (hx, hy) = paper_page(672, 66, 262, 330)
-    s.append(page)
-    cx, cy, cw, ch = 970, 92, 250, 286
-    s.append(card(cx, cy, cw, ch))
-    s.append(t(cx + 20, cy + 32, "CLAIM", 11, MUTED, "700", extra=' letter-spacing="1.4"'))
-    s.append(f'<g class="pop"><rect x="{cx+cw-118}" y="{cy+15}" width="102" height="25" rx="12.5" fill="{GREEN}" '
-             f'fill-opacity=".15" stroke="{GREEN}" stroke-opacity=".55"/>'
-             + t(cx + cw - 67, cy + 32, "✓ SUPPORTED", 11, GREEN_T, "700", "middle", extra=' letter-spacing=".6"') + "</g>")
-    s.append(t(cx + 20, cy + 72, "SRT-Large reaches", 21, INK, "800"))
-    s.append(t(cx + 20, cy + 99, "81.4 F1 on NarrativeQA", 19, "url(#gradH)", "800"))
-    s.append(f'<line x1="{cx+20}" y1="{cy+118}" x2="{cx+cw-20}" y2="{cy+118}" stroke="{LINE}" stroke-opacity=".2"/>')
-    rows = (("QUOTE", "found on the page · exact", VIOLET_T), ("NUMBER", "81.4 = 81.4 in the evidence", CYAN_T),
-            ("CITATION", "[p. 4, §4.2, Table 1]", TEAL_T))
-    for i, (lab, val, c) in enumerate(rows):
-        yy = cy + 144 + i * 46
-        s.append(t(cx + 20, yy, lab, 10.5, MUTED, "700", extra=' letter-spacing="1.2"'))
-        s.append(t(cx + 20, yy + 20, val, 12.5, c, None, cls="mono"))
-    sy = cy + 144 + 2 * 46 + 15
-    s.append(f'<path class="flow" d="M{hx+2} {hy} C {hx+40} {hy}, {cx-36} {sy}, {cx-4} {sy}" fill="none" '
-             f'stroke="{CYAN}" stroke-width="2" marker-end="url(#arrow)"/>')
-    s.append(t(1216, 430, "example from the bundled synthetic test paper", 11, MUTED, None, "end", extra=' font-style="italic"'))
+        x += tw + 12
+    px, py, pw, ph = 650, 56, 300, 350
+    page, (hx, hy) = paper_sheet(px, py, pw, ph)
+    s.append(f'<g transform="rotate(-2 {px+pw/2} {py+ph/2})">{page}</g>')
+    nx, ny, nw, nh = 958, 118, 268, 250
+    note = [f'<rect x="{nx}" y="{ny}" width="{nw}" height="{nh}" rx="3" fill="#fffdf6" stroke="{RULE}" filter="url(#lift)"/>',
+            f'<rect x="{nx+nw/2-34}" y="{ny-9}" width="68" height="18" rx="2" fill="{HILITE}" fill-opacity=".85" '
+            f'transform="rotate(-3 {nx+nw/2} {ny})"/>']
+    note.append(f'<g class="glow" transform="rotate(-8 {nx+nw-62} {ny+46})">'
+                f'<rect x="{nx+nw-118}" y="{ny+30}" width="104" height="32" rx="5" fill="none" stroke="{GREEN}" stroke-width="2.4"/>'
+                + t(nx + nw - 66, ny + 52, "SUPPORTED", 13.5, GREEN, "800", "middle", extra=' letter-spacing="1.5"') + "</g>")
+    note.append(t(nx + 20, ny + 46, "Claim", 13, MUTED, "700", cls="serif", extra=' font-style="italic"'))
+    note.append(t(nx + 20, ny + 92, "SRT-Large reaches", 18, INK, "700", cls="serif"))
+    note.append(t(nx + 20, ny + 116, "81.4 F1 on NarrativeQA.", 18, INK, "700", cls="serif"))
+    for i, (lab, val, c) in enumerate((("quote", "found on the page", GREEN),
+                                       ("number", "81.4 = 81.4", GREEN),
+                                       ("cite", "[p. 4, §4.2, Table 1]", BLUE))):
+        yy = ny + 156 + i * 28
+        note.append(f'<line x1="{nx+16}" y1="{yy+9}" x2="{nx+nw-16}" y2="{yy+9}" stroke="{RULE}"/>')
+        note.append(t(nx + 20, yy, lab, 12, MUTED, None, cls="serif", extra=' font-style="italic"'))
+        note.append(t(nx + 80, yy, val, 12, DARK[c], "600", cls="mono"))
+    s.append(f'<g transform="rotate(1.5 {nx+nw/2} {ny+nh/2})">' + "\n".join(note) + "</g>")
+    a = math.radians(-2)
+    cx0, cy0 = px + pw / 2, py + ph / 2
+    rx = cx0 + (hx - cx0) * math.cos(a) - (hy - cy0) * math.sin(a)
+    ry = cy0 + (hx - cx0) * math.sin(a) + (hy - cy0) * math.cos(a)
+    s.append(f'<path class="ink" d="M{rx:.0f} {ry:.0f} C {rx+24:.0f} {ry+10:.0f}, {nx-30} {ny+170}, {nx+10} {ny+182}" '
+             f'fill="none" stroke="{CORAL}" stroke-width="2.2" stroke-linecap="round" marker-end="url(#aCoral)"/>')
+    s.append(t(1216, 440, "example from the bundled synthetic test paper", 11, MUTED, None, "end", cls="serif",
+               extra=' font-style="italic"'))
     s.append("</svg>")
     return "\n".join(s)
 
 
-# =========================================================================== pipeline
+# =========================================================================== pipeline (a metro line)
 def pipeline():
-    W, H = 1280, 560
+    W, H = 1280, 540
     s = [head(W, H, "How PaperMind analyses a paper",
-              "Six steps: ingest and index the PDF, then plan, analyse with specialist agents, verify and report. "
-              "Agents whose claims fail to ground are retried a limited number of times.")]
-    s.append(title_block("How PaperMind analyses a paper",
-                         "The PDF is indexed once, page by page. Then a planned team of agents analyses it, and nothing is cited unchecked."))
-    steps = [
-        ("upload", "Ingest", ["PDF parsed page by", "page; OCR fallback", "for scanned pages"], CYAN),
-        ("index", "Index", ["Page-aware chunks;", "BM25 + dense search", "fused with RRF"], CYAN),
-        ("plan", "Plan", ["Planner picks the", "specialists this", "paper needs, and why"], VIOLET_T),
-        ("hex", "Analyse", ["Specialists run in", "parallel, each on its", "own targeted evidence"], VIOLET_T),
-        ("verify", "Verify", ["Evidence re-retrieved", "independently; code", "checks quotes + numbers"], GREEN),
-        ("report", "Report", ["Built from validated", "findings, no model", "call; gaps labelled"], AMBER),
-    ]
-    x0, cw, gap, y0, ch = 48, 172, 30, 186, 214
-    la_end = x0 + 2 * cw + gap
-    lb_start = x0 + 2 * (cw + gap)
-    s.append(t(x0, 160, "PREPARE THE PAPER · once per PDF", 12, CYAN_T, "700", extra=' letter-spacing="1.3"'))
-    s.append(f'<line x1="{x0}" y1="171" x2="{la_end}" y2="171" stroke="{CYAN}" stroke-opacity=".45"/>')
-    s.append(t(lb_start, 160, "ANALYSE · a typed state graph of agents", 12, VIOLET_T, "700", extra=' letter-spacing="1.3"'))
-    s.append(f'<line x1="{lb_start}" y1="171" x2="{W-48}" y2="171" stroke="{VIOLET}" stroke-opacity=".55"/>')
-    for i, (ic, name, lines, c) in enumerate(steps):
-        x = x0 + i * (cw + gap)
-        s.append(card(x, y0, cw, ch, c, ".35"))
-        s.append(f'<circle cx="{x+26}" cy="{y0+28}" r="13" fill="url(#grad)"/>')
-        s.append(t(x + 26, y0 + 33, str(i + 1), 13, "#fff", "800", "middle"))
-        s.append(tile(ic, x + cw - 72, y0 + 16, c))
-        s.append(t(x + 16, y0 + 116, name, 17, INK, "800"))
+              "A line with six stations: ingest and index the PDF once, then plan, analyse with specialist agents, "
+              "verify and report. Agents whose claims fail to ground loop back for a limited number of retries.")]
+    s.append(heading("How PaperMind analyses a paper",
+                     "The PDF is indexed once, page by page. Then a planned team of agents analyses it; nothing is cited unchecked."))
+    xs = [140 + i * 200 for i in range(6)]
+    ly = 268
+    steps = [("Ingest", ["PDF parsed page by", "page; OCR fallback", "for scanned pages"], BLUE),
+             ("Index", ["page-aware chunks;", "BM25 + dense search", "fused with RRF"], BLUE),
+             ("Plan", ["the planner picks", "the specialists this", "paper needs, and why"], CORAL),
+             ("Analyse", ["specialists run in", "parallel, each on its", "own targeted evidence"], CORAL),
+             ("Verify", ["evidence re-retrieved", "independently; code", "checks quotes, numbers"], GREEN),
+             ("Report", ["built from validated", "findings, no model", "call; gaps labelled"], MUSTARD)]
+    for x0, x1, lab, c in ((xs[0] - 50, xs[1] + 50, "PREPARE THE PAPER  ·  once per PDF", BLUE),
+                           (xs[2] - 50, xs[5] + 50, "ANALYSE  ·  a typed state graph of agents", CORAL)):
+        s.append(f'<path d="M{x0} 176 v-8 H{x1} v8" fill="none" stroke="{c}" stroke-width="1.6"/>')
+        s.append(t((x0 + x1) / 2, 158, lab, 12, DARK[c], "700", "middle", extra=' letter-spacing="1.6"'))
+    s.append(f'<line x1="{xs[0]-60}" y1="{ly}" x2="{xs[1]+100}" y2="{ly}" stroke="{BLUE}" stroke-width="8" stroke-linecap="round"/>')
+    s.append(f'<line x1="{xs[1]+100}" y1="{ly}" x2="{xs[5]+60}" y2="{ly}" stroke="{CORAL}" stroke-width="8" stroke-linecap="round"/>')
+    s.append(f'<line class="ink" x1="{xs[0]-60}" y1="{ly}" x2="{xs[5]+60}" y2="{ly}" stroke="#fff" stroke-width="2" stroke-opacity=".8"/>')
+    for i, (x, (name, lines, c)) in enumerate(zip(xs, steps)):
+        s.append(t(x, ly - 44, name, 21, INK, "700", "middle", cls="serif"))
+        s.append(f'<circle cx="{x}" cy="{ly}" r="24" fill="{SHEET}" stroke="{c}" stroke-width="5"/>')
+        s.append(t(x, ly + 7, str(i + 1), 20, DARK[c], "700", "middle", cls="serif"))
         for k, ln in enumerate(lines):
-            s.append(t(x + 16, y0 + 142 + k * 19, ln, 12.5, SOFT))
-        if i < len(steps) - 1:
-            ax = x + cw + 3
-            s.append(f'<path class="flow" d="M{ax} {y0+ch/2} H{ax+gap-6}" stroke="{CYAN}" stroke-width="2" '
-                     f'marker-end="url(#arrow)" fill="none"/>')
-    vx = x0 + 4 * (cw + gap) + cw / 2
-    ax_ = x0 + 3 * (cw + gap) + cw / 2
-    by = y0 + ch + 2
-    s.append(f'<path class="flow" d="M{vx} {by} C {vx} {by+62}, {ax_} {by+62}, {ax_} {by+8}" fill="none" '
-             f'stroke="{ROSE}" stroke-width="2" marker-end="url(#arrowR)"/>')
-    s.append(t((vx + ax_) / 2, by + 76, "claims below the threshold → only those agents retried, with feedback (bounded)",
-               12.5, ROSE_T, "600", "middle"))
-    s.append(t((x0 + la_end) / 2, by + 40, "a chunk never crosses a page boundary", 12.5, CYAN_T, "600", "middle"))
-    yy = H - 52
-    s.append(t(48, yy + 19, "BUILT WITH", 11, MUTED, "700", extra=' letter-spacing="1.4"'))
-    x = 140
-    for lab in ("Python 3.11", "FastAPI", "Pydantic v2", "PyMuPDF", "PP-Structure", "PaddleOCR-VL",
-                "BM25 + dense", "OpenAI-compatible LLMs"):
-        g, cwid = chip(x, yy, lab, LINE, "#cbd5e1", 12, 28, 12, False)
-        s.append(g)
-        x += cwid + 10
+            s.append(t(x, ly + 60 + k * 19, ln, 13.5, MUTED, None, "middle"))
+    by = ly + 124
+    s.append(f'<path class="ink" d="M{xs[4]} {by} C {xs[4]} {by+56}, {xs[3]} {by+56}, {xs[3]} {by+6}" fill="none" '
+             f'stroke="{CORAL}" stroke-width="2.2" marker-end="url(#aCoral)"/>')
+    s.append(t((xs[3] + xs[4]) / 2, by + 74, "claims below the threshold: only those agents re-run, with feedback (bounded)",
+               13, CORAL_D, "600", "middle", cls="serif", extra=' font-style="italic"'))
+    s.append(t((xs[0] + xs[1]) / 2, by + 30, "a chunk never crosses a page boundary", 13, BLUE_D, "600", "middle",
+               cls="serif", extra=' font-style="italic"'))
+    s.append(f'<line x1="56" y1="{H-58}" x2="{W-56}" y2="{H-58}" stroke="{RULE}" stroke-width="1.5"/>')
+    s.append(t(56, H - 30, "Built with", 13, INK, "700", cls="serif", extra=' font-style="italic"'))
+    s.append(t(140, H - 30, "Python 3.11 · FastAPI · Pydantic v2 · PyMuPDF · PP-Structure · PaddleOCR-VL · "
+               "BM25 + dense retrieval · OpenAI-compatible LLMs", 13, MUTED, None, cls="mono"))
     s.append("</svg>")
     return "\n".join(s)
 
 
-# =========================================================================== agents
+# =========================================================================== agents (hub, tabs, merge)
 def agents():
-    W, H = 1280, 640
+    W, H = 1280, 600
     s = [head(W, H, "The PaperMind agent team",
-              "A planner chooses specialist agents (summary, methodology, experiments, and math only when the paper "
-              "has mathematics); a verification agent re-checks their claims; a synthesizer writes the report "
-              "without a model call.")]
-    s.append(title_block("The agent team",
-                         "No agent reads the whole PDF, and agents never pass prose to each other: only validated, typed findings."))
-
-    def box(x, y, bw, bh, ic, c, label, name, lines, chip_text=None):
-        o = [card(x, y, bw, bh, c, ".4"),
-             f'<rect x="{x+14}" y="{y}" width="{bw-28}" height="3" rx="1.5" fill="{c}" fill-opacity=".9"/>',
-             tile(ic, x + 20, y + 22, c, 52),
-             t(x + 88, y + 41, label, 11, TINT.get(c, c), "700", extra=' letter-spacing="1.4"'),
-             t(x + 88, y + 66, name, 20, INK, "800")]
-        for k, ln in enumerate(lines):
-            o.append(t(x + 20, y + 102 + k * 20, ln, 13.5, SOFT))
-        if chip_text:
-            g, _ = chip(x + 20, y + bh - 42, chip_text, c, TINT.get(c, c), 12, 26, 11)
-            o.append(g)
-        return "\n".join(o)
-
-    y1, h1 = 140, 132
-    s.append(box(48, y1, 300, h1, "paper", AMBER, "INPUT", "One paper",
-                 ["A research-paper PDF,", "indexed page by page."]))
-    s.append(box(446, y1, 388, h1, "plan", VIOLET_T, "TEAM LEAD", "Planner",
-                 ["Chooses which specialists this paper", "needs, and says why."]))
-    s.append(box(932, y1, 300, h1, "report", AMBER, "WRITER", "Synthesizer",
-                 ["Renders the report from validated", "findings. No model call."]))
-    my = y1 + h1 / 2
-    s.append(f'<path class="flow" d="M352 {my} H440" stroke="{CYAN}" stroke-width="2" fill="none" marker-end="url(#arrow)"/>')
-    s.append(f'<path class="flow" d="M838 {my} H926" stroke="{GREEN}" stroke-width="2" fill="none" marker-end="url(#arrowG)"/>')
-    s.append(t(882, my - 12, "verified findings", 11.5, GREEN_T, "600", "middle"))
-
-    y2, h2 = 352, 178
-    bw, gp = 278, 24
-    xs = [48 + i * (bw + gp) for i in range(4)]
-    specs = [
-        ("report", CYAN, "SPECIALIST", "Summary", ["Problem, contribution, data,", "method, results, limitations."], "always"),
-        ("plan", VIOLET, "SPECIALIST", "Methodology", ["Architecture, training, inference,", "design decisions, prior work."], "always"),
-        ("chart", TEAL, "SPECIALIST", "Experiments", ["Datasets, baselines, metrics,", "ablations, significance."], "when results are found"),
-        ("sigma", AMBER, "SPECIALIST", "Math", ["Equations, variables, losses,", "objectives, derivations."], "only if the paper has maths"),
-    ]
-    for x, (ic, c, lab, name, lines, ct) in zip(xs, specs):
-        s.append(box(x, y2, bw, h2, ic, c, lab, name, lines, ct))
-    sb = y1 + h1 + 2
-    for x, sx in zip(xs, (580, 620, 660, 700)):
-        tx = x + bw / 2
-        s.append(f'<path class="flow" d="M{sx} {sb} C {sx} {sb+44}, {tx} {y2-44}, {tx} {y2-6}" fill="none" '
-                 f'stroke="{VIOLET_T}" stroke-width="2" stroke-opacity=".9" marker-end="url(#arrowV)"/>')
-    pill = "targeted evidence ↓   typed findings ↑"
-    pw = w(pill, 12, mono=True) + 28
-    s.append(f'<rect x="{640-pw/2:.0f}" y="{(sb+y2)/2-15:.0f}" width="{pw:.0f}" height="28" rx="14" fill="{BG}" '
-             f'stroke="{VIOLET}" stroke-opacity=".6"/>')
-    s.append(t(640, (sb + y2) / 2 + 3.5, pill, 12, VIOLET_T, "600", "middle", cls="mono"))
-    vy = H - 76
-    for x in xs:
-        s.append(f'<path d="M{x+bw/2} {y2+h2+2} V{vy-4}" stroke="{GREEN}" stroke-opacity=".5" stroke-dasharray="2 4"/>')
-    s.append(card(48, vy, W - 96, 54, GREEN, ".5", shadow=False, rx=14))
-    s.append(icon("verify", 80, vy + 27, GREEN_T, 2))
-    s.append(f'<text class="sans" x="112" y="{vy+32}" font-size="13.5" fill="{SOFT}"><tspan font-size="14.5" '
-             f'font-weight="700" fill="{INK}">Verification agent:</tspan> re-retrieves evidence for every high-impact '
-             f'claim on its own, then code checks pages, quotes and numbers. Failed agents are retried.</text>')
+              "The planner fans a paper out to specialist agents: summary, methodology, experiments, and math only "
+              "when the paper has mathematics. Their findings merge into the verification agent, then the synthesizer.")]
+    s.append(heading("The agent team",
+                     "No agent reads the whole PDF, and agents never pass prose to each other: only validated, typed findings."))
+    cy = 362
+    dx, dy = 60, cy - 70
+    s.append(f'<path d="M{dx} {dy} h92 l26 26 v114 h-118 z" fill="{SHEET}" stroke="{INK}" stroke-width="1.6" filter="url(#lift)"/>')
+    s.append(f'<path d="M{dx+92} {dy} v26 h26" fill="none" stroke="{INK}" stroke-width="1.6"/>')
+    for k in range(5):
+        s.append(f'<line x1="{dx+16}" y1="{dy+46+k*16}" x2="{dx+(100 if k < 4 else 62)}" y2="{dy+46+k*16}" stroke="#d8d2c4" stroke-width="3" stroke-linecap="round"/>')
+    s.append(t(dx + 59, dy + 168, "one paper", 15, INK, "700", "middle", cls="serif", extra=' font-style="italic"'))
+    hx, hr = 330, 82
+    s.append(f'<path class="ink" d="M{dx+124} {cy} H{hx-hr-14}" stroke="{INK}" stroke-width="2" marker-end="url(#aInk)"/>')
+    s.append(f'<circle cx="{hx}" cy="{cy}" r="{hr+10}" fill="none" stroke="{CORAL}" stroke-width="1.4" stroke-dasharray="3 5"/>')
+    s.append(f'<circle cx="{hx}" cy="{cy}" r="{hr}" fill="{INK}"/>')
+    s.append(t(hx, cy - 6, "Planner", 22, "#fff", "700", "middle", cls="serif"))
+    s.append(t(hx, cy + 16, "picks the specialists", 12, "#cfd5e2", None, "middle"))
+    s.append(t(hx, cy + 32, "and says why", 12, "#cfd5e2", None, "middle"))
+    tx, tw, th, gap = 520, 400, 78, 22
+    specs = [("S", "Summary", "problem, contribution, data, results, limits", "ALWAYS", BLUE),
+             ("M", "Methodology", "architecture, training, inference, design", "ALWAYS", CORAL),
+             ("E", "Experiments", "datasets, baselines, metrics, ablations", "WHEN RESULTS ARE FOUND", GREEN),
+             ("Σ", "Math", "equations, variables, losses, derivations", "ONLY IF THE PAPER HAS MATHS", MUSTARD)]
+    total = 4 * th + 3 * gap
+    top = cy - total / 2
+    mids = []
+    for i, (ch, name, desc, when, c) in enumerate(specs):
+        y = top + i * (th + gap)
+        mids.append(y + th / 2)
+        tab_w = w(when, 9.5, True) + len(when) * 0.5 + 22
+        s.append(f'<path d="M{tx+14} {y} v-12 q0 -4 4 -4 h{tab_w:.0f} q4 0 4 4 v12 z" fill="{SOFT[c]}" stroke="{c}" stroke-width="1.4"/>')
+        s.append(t(tx + 25, y - 4, when, 9.5, DARK[c], "700", extra=' letter-spacing=".5"'))
+        s.append(f'<rect x="{tx}" y="{y}" width="{tw}" height="{th}" rx="8" fill="{SHEET}" stroke="{c}" stroke-width="1.6" filter="url(#lift)"/>')
+        s.append(f'<circle cx="{tx+38}" cy="{y+th/2}" r="20" fill="{SOFT[c]}" stroke="{c}" stroke-width="1.6"/>')
+        s.append(t(tx + 38, y + th / 2 + 7, ch, 19, DARK[c], "700", "middle", cls="serif"))
+        s.append(t(tx + 72, y + th / 2 - 4, name, 18, INK, "700", cls="serif"))
+        s.append(t(tx + 72, y + th / 2 + 17, desc, 12.5, MUTED))
+        s.append(f'<path class="ink" d="M{hx+hr+12} {cy} C {hx+hr+70} {cy}, {tx-70} {y+th/2}, {tx-8} {y+th/2}" '
+                 f'fill="none" stroke="{c}" stroke-width="2" marker-end="url(#aInk)"/>')
+    vx, vy, vw, vh = 1010, cy - 128, 222, 120
+    s.append(f'<rect x="{vx}" y="{vy}" width="{vw}" height="{vh}" rx="10" fill="{SOFT[GREEN]}" stroke="{GREEN}" stroke-width="1.8"/>')
+    s.append(f'<path d="M{vx+34} {vy+20}l16 6v12c0 11-7 18-16 22c-9-4-16-11-16-22v-12z" fill="{SHEET}" stroke="{GREEN}" stroke-width="2"/>'
+             f'<path d="M{vx+27} {vy+39}l5 5 9-10" fill="none" stroke="{GREEN}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>')
+    s.append(t(vx + 62, vy + 38, "Verification", 18, GREEN_D, "700", cls="serif"))
+    s.append(t(vx + 62, vy + 57, "agent", 13, GREEN_D))
+    s.append(t(vx + 18, vy + 88, "fetches the evidence itself;", 12.5, INK))
+    s.append(t(vx + 18, vy + 106, "code checks quotes + numbers", 12.5, INK))
+    for m in mids:
+        s.append(f'<path d="M{tx+tw+4} {m} C {tx+tw+50} {m}, {vx-50} {vy+vh/2}, {vx-6} {vy+vh/2}" fill="none" '
+                 f'stroke="{GREEN}" stroke-width="1.6" stroke-opacity=".75" marker-end="url(#aGreen)"/>')
+    sy = vy + vh + 58
+    s.append(f'<path class="ink" d="M{vx+vw/2} {vy+vh+4} V{sy-6}" stroke="{GREEN}" stroke-width="2" marker-end="url(#aGreen)"/>')
+    s.append(t(vx + vw / 2 + 10, vy + vh + 34, "verified findings", 12, GREEN_D, "600", cls="serif", extra=' font-style="italic"'))
+    s.append(f'<rect x="{vx}" y="{sy}" width="{vw}" height="86" rx="10" fill="{SOFT[MUSTARD]}" stroke="{MUSTARD}" stroke-width="1.8"/>')
+    s.append(t(vx + 18, sy + 32, "Synthesizer", 18, MUSTARD_D, "700", cls="serif"))
+    s.append(t(vx + 18, sy + 55, "writes the report from validated", 12.5, INK))
+    s.append(t(vx + 18, sy + 73, "findings. No model call.", 12.5, INK))
+    s.append(f'<path d="M{vx+30} {vy-6} C {vx-10} {vy-60}, {tx+tw+10} {top-70}, {tx+tw-30} {top-22}" fill="none" '
+             f'stroke="{CORAL}" stroke-width="1.8" stroke-dasharray="5 5" marker-end="url(#aCoral)"/>')
+    s.append(t(vx + 40, vy - 40, "failed to ground: retried", 12.5, CORAL_D, "600", cls="serif", extra=' font-style="italic"'))
     s.append("</svg>")
     return "\n".join(s)
 
 
-# =========================================================================== verification
+# =========================================================================== verification (slip, ledger, staircase)
 def verification():
-    W, H = 1280, 580
+    W, H = 1280, 560
     s = [head(W, H, "How a claim earns a citation",
-              "A claim is re-checked by code: page in range, quote present, section resolves, numbers match. Quotes "
-              "match exactly, after normalising, approximately (labelled), or not at all; an unverifiable quote is "
-              "never shown as a citation but kept in the evidence appendix.")]
-    s.append(title_block("How a claim earns a citation",
-                         "A citation appears only when its quote was found at the cited place. Failures are labelled, never hidden."))
-    top = 150
-    for x, lab, c in ((48, "1 · CLAIM FROM AN AGENT", CYAN_T), (428, "2 · CODE CHECKS", VIOLET_T),
-                      (836, "3 · QUOTE MATCH", GREEN_T)):
-        s.append(t(x, top, lab, 12, c, "700", extra=' letter-spacing="1.4"'))
-    # claim
-    cx, cy, cw, ch = 48, top + 16, 340, 300
-    s.append(card(cx, cy, cw, ch, CYAN, ".45"))
-    s.append(t(cx + 22, cy + 38, "EXPERIMENTS AGENT", 11, CYAN_T, "700", extra=' letter-spacing="1.3"'))
-    s.append(t(cx + 22, cy + 74, "SRT-Large reaches 81.4 F1", 18, INK, "800"))
-    s.append(t(cx + 22, cy + 98, "on NarrativeQA.", 18, INK, "800"))
-    s.append(f'<rect x="{cx+22}" y="{cy+120}" width="{cw-44}" height="92" rx="10" fill="#111a2e" stroke="{LINE}" stroke-opacity=".18"/>')
-    s.append(t(cx + 36, cy + 145, "cites [S3] →", 12.5, MUTED, None, cls="mono"))
-    s.append(t(cx + 36, cy + 168, "p. 4 · §4.2 Main Results", 12.5, CYAN_T, None, cls="mono"))
-    s.append(t(cx + 36, cy + 191, "Table 1", 12.5, CYAN_T, None, cls="mono"))
-    s.append(t(cx + 22, cy + 244, "The verifier fetches its own evidence,", 12.5, MUTED))
-    s.append(t(cx + 22, cy + 263, "not the agent's, before it rules.", 12.5, MUTED))
-    # checks
-    kx, ky, kw, kh = 428, top + 16, 368, 300
-    s.append(card(kx, ky, kw, kh, VIOLET, ".45"))
-    for i, ck in enumerate(("Page is inside the PDF", "Quote occurs in the cited text", "Section resolves in the index",
-                            "Numbers match their evidence", "Fields and confidence are valid")):
-        yy = ky + 46 + i * 40
-        s.append(f'<circle cx="{kx+33}" cy="{yy-5}" r="11" fill="{GREEN}" fill-opacity=".16" stroke="{GREEN}" stroke-opacity=".6"/>')
-        s.append(f'<path d="M{kx+28} {yy-5}l3.5 3.5 6.5-7" fill="none" stroke="{GREEN_T}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>')
-        s.append(t(kx + 54, yy, ck, 14, INK))
-    s.append(f'<line x1="{kx+22}" y1="{ky+250}" x2="{kx+kw-22}" y2="{ky+250}" stroke="{LINE}" stroke-opacity=".2"/>')
-    s.append(t(kx + 22, ky + 276, "Code can only lower the model's verdict, never raise it.", 12.5, VIOLET_T, "600"))
-    # tiers
-    tx, ty, tw, th = 836, top + 16, 396, 300
-    s.append(card(tx, ty, tw, th, GREEN, ".45"))
-    tiers = (("Exact", 1.0, GREEN, "cited"), ("Normalised", 0.82, GREEN, "cited"),
-             ("Approximate", 0.55, AMBER, "cited, labelled"), ("Unverifiable", 0.12, ROSE, "not cited"))
-    for i, (name, frac, c, out) in enumerate(tiers):
-        yy = ty + 30 + i * 62
-        s.append(t(tx + 22, yy + 14, name, 15, INK, "700"))
-        s.append(t(tx + tw - 22, yy + 14, out, 12.5, TINT[c], "600", "end"))
-        bw_ = tw - 44
-        s.append(f'<rect x="{tx+22}" y="{yy+24}" width="{bw_}" height="10" rx="5" fill="#111a2e" stroke="{LINE}" stroke-opacity=".15"/>')
-        s.append(f'<rect x="{tx+22}" y="{yy+24}" width="{bw_*frac:.0f}" height="10" rx="5" fill="{c}" fill-opacity=".85"/>')
-    s.append(t(tx + 22, ty + th - 18, "bar = confidence kept after the match", 11.5, MUTED, None, extra=' font-style="italic"'))
-    s.append(f'<path class="flow" d="M{cx+cw+4} {cy+150} H{kx-8}" stroke="{CYAN}" stroke-width="2" fill="none" marker-end="url(#arrow)"/>')
-    s.append(f'<path class="flow" d="M{kx+kw+4} {ky+150} H{tx-8}" stroke="{VIOLET_T}" stroke-width="2" fill="none" marker-end="url(#arrowV)"/>')
-    ry = H - 74
-    s.append(f'<rect x="48" y="{ry}" width="{W-96}" height="44" rx="12" fill="{GREEN}" fill-opacity=".08" stroke="{GREEN}" stroke-opacity=".45"/>')
-    s.append(t(70, ry + 27.5, "ANNOTATE AND DOWNGRADE", 12, GREEN_T, "800", extra=' letter-spacing="1.2"'))
-    s.append(t(292, ry + 27.5, "A citation that fails is never silently deleted: it stays in the evidence appendix, marked unverifiable.",
-               13.5, "#d1fae5"))
+              "A claim from an agent is re-checked by code: page in range, quote present, section resolves, numbers "
+              "match. Quotes match exactly, after normalising, approximately (labelled), or not at all; an "
+              "unverifiable quote is never shown as a citation but kept in the evidence appendix.")]
+    s.append(heading("How a claim earns a citation",
+                     "A citation appears only when its quote was found at the cited place. Failures are labelled, never hidden."))
+    top = 164
+    cx, cy, cw, ch = 56, top, 330, 270
+    s.append(f'<rect x="{cx}" y="{cy}" width="{cw}" height="{ch}" rx="4" fill="{SHEET}" stroke="{RULE}" filter="url(#lift)" '
+             f'transform="rotate(-1.5 {cx+cw/2} {cy+ch/2})"/>')
+    s.append(t(cx + 22, cy + 40, "1 · AN AGENT CLAIMS", 12.5, BLUE_D, "700", extra=' letter-spacing="1"'))
+    s.append(t(cx + 18, cy + 108, "“", 70, BLUE, "700", cls="serif", extra=' fill-opacity=".35"'))
+    s.append(t(cx + 56, cy + 92, "SRT-Large reaches", 20, INK, "700", cls="serif"))
+    s.append(t(cx + 56, cy + 118, "81.4 F1 on NarrativeQA.”", 20, INK, "700", cls="serif"))
+    s.append(f'<line x1="{cx+22}" y1="{cy+146}" x2="{cx+cw-22}" y2="{cy+146}" stroke="{RULE}"/>')
+    s.append(t(cx + 22, cy + 172, "cites [S3] → p. 4, §4.2, Table 1", 12.5, BLUE_D, "600", cls="mono"))
+    s.append(t(cx + 22, cy + 212, "The verifier then fetches its own", 13.5, MUTED, None, cls="serif", extra=' font-style="italic"'))
+    s.append(t(cx + 22, cy + 232, "evidence, not the agent's.", 13.5, MUTED, None, cls="serif", extra=' font-style="italic"'))
+    lx, ly, lw, lh = 450, top, 370, 270
+    s.append(f'<rect x="{lx}" y="{ly}" width="{lw}" height="{lh}" rx="4" fill="#fffdf6" stroke="{RULE}" filter="url(#lift)"/>')
+    s.append(f'<line x1="{lx+44}" y1="{ly}" x2="{lx+44}" y2="{ly+lh}" stroke="{CORAL}" stroke-opacity=".45"/>')
+    s.append(t(lx + 60, ly + 36, "2 · CHECKED BY CODE", 12.5, GREEN_D, "700", extra=' letter-spacing="1"'))
+    for i, ck in enumerate(("page is inside the PDF", "quote occurs in the cited text", "section resolves in the index",
+                            "numbers match their evidence", "fields and confidence are valid")):
+        yy = ly + 80 + i * 34
+        s.append(f'<line x1="{lx}" y1="{yy+12}" x2="{lx+lw}" y2="{yy+12}" stroke="{BLUE}" stroke-opacity=".22"/>')
+        s.append(f'<rect x="{lx+60}" y="{yy-12}" width="17" height="17" rx="3" fill="{SHEET}" stroke="{GREEN}" stroke-width="1.8"/>')
+        s.append(f'<path d="M{lx+63} {yy-4}l4 4 8-10" fill="none" stroke="{GREEN}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>')
+        s.append(t(lx + 88, yy + 2, ck, 14.5, INK, None, cls="serif"))
+    s.append(t(lx + 60, ly + lh - 20, "Code can lower the model's verdict, never raise it.", 12.5, GREEN_D, "600"))
+    sx0, base, sw = 884, top + 250, 88
+    tiers = (("exact", "cited", GREEN, 182), ("normalised", "cited", GREEN, 142),
+             ("approximate", "labelled", MUSTARD, 96), ("unverifiable", "not cited", CORAL, 40))
+    s.append(t(sx0, top + 4, "3 · HOW WELL THE QUOTE MATCHED", 12.5, MUSTARD_D, "700", extra=' letter-spacing="1"'))
+    for i, (name, out, c, hgt) in enumerate(tiers):
+        x = sx0 + i * sw
+        s.append(f'<rect x="{x}" y="{base-hgt}" width="{sw-6}" height="{hgt}" rx="3" fill="{SOFT[c]}" stroke="{c}" stroke-width="1.6"/>')
+        s.append(t(x + (sw - 6) / 2, base - hgt - 24, name, 13, INK, "700", "middle", cls="serif"))
+        s.append(t(x + (sw - 6) / 2, base - hgt - 8, out, 11.5, DARK[c], "600", "middle"))
+    s.append(f'<line x1="{sx0-6}" y1="{base}" x2="{sx0+4*sw}" y2="{base}" stroke="{INK}" stroke-width="1.6"/>')
+    s.append(t(sx0, base + 22, "step height = confidence kept", 12, MUTED, None, cls="serif", extra=' font-style="italic"'))
+    s.append(f'<path class="ink" d="M{cx+cw+8} {cy+130} H{lx-12}" stroke="{INK}" stroke-width="2" marker-end="url(#aInk)"/>')
+    s.append(f'<path class="ink" d="M{lx+lw+8} {ly+130} H{sx0-16}" stroke="{INK}" stroke-width="2" marker-end="url(#aInk)"/>')
+    by = H - 72
+    s.append(f'<g transform="rotate(-3 180 {by+20})"><rect x="60" y="{by}" width="244" height="40" rx="4" fill="none" '
+             f'stroke="{CORAL}" stroke-width="2.4"/>' + t(182, by + 26, "ANNOTATE & DOWNGRADE", 14, CORAL, "800", "middle",
+                                                          extra=' letter-spacing="1.6"') + "</g>")
+    s.append(t(330, by + 26, "A citation that fails is never silently deleted: it stays in the evidence appendix, marked unverifiable.",
+               15, INK, None, cls="serif"))
     s.append("</svg>")
     return "\n".join(s)
 
